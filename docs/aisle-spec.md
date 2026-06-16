@@ -5,7 +5,7 @@
 **Status:** Phase 1 spec, locked for build
 **Author:** Sanjana Mohan (open-source project, MIT-licensed)
 **Domain:** `sanjana-mohan.com/aisle`
-**Repository:** `github.com/sanjana-mohan/aisle` (placeholder — confirm GitHub handle)
+**Repository:** `github.com/mohan-sanjana/aisle`
 **Last updated:** 2026-06-15
 **Companion files:**
 - `sizing-math.md` — Sizer calculation engine specification
@@ -401,7 +401,7 @@ Recommended way to slice the work for parallel agents:
 The seven blocking open questions have been resolved (see Appendix B). Remaining items are tracking rather than blocking:
 
 1. **Product naming for sub-features.** "Sizer" and "Designer" are working names. Could rebrand as Phase 1 nears launch.
-2. **GitHub handle confirmation.** Spec assumes `github.com/sanjana-mohan/aisle`; confirm the actual handle.
+2. ~~GitHub handle confirmation.~~ Resolved: `github.com/mohan-sanjana/aisle`.
 3. **Throughput benchmark coverage.** The Sizer's lookup table will have gaps for less common (model × GPU × engine) tuples. Triage on a case-by-case basis; favor the closest reasonable benchmark and document the assumption.
 4. **MoE error margin calibration.** ±30% is a starting estimate. Tighten or loosen post-pilot based on user feedback and real benchmark data.
 5. **Analytics platform choice.** Plausible vs Cloudflare Web Analytics. Both free at this scale; decide at launch.
@@ -473,7 +473,7 @@ Six open-ended questions (skip any that feel obvious from the walkthrough):
 | 3 | Throughput coefficient | Conservative default per `(family, gpu, engine, precision)` tuple · sourced citation · editable override field |
 | 4 | MoE handling | Sensible active-param defaults from `model_families.json` · "Approximate ±30%" badge on MoE · "±15%" on dense |
 | 5 | Roadmap silicon | Visible in Knowledge content only · filtered out of Sizer and Designer until graduated |
-| 6 | Brand and distribution | Aisle (AI Sizing and Learning Environment) · personal brand by Sanjana Mohan · hosted at `sanjana-mohan.com/aisle` · OSS repo at `github.com/sanjana-mohan/aisle` |
+| 6 | Brand and distribution | Aisle (AI Sizing and Learning Environment) · personal brand by Sanjana Mohan · hosted at `sanjana-mohan.com/aisle` · OSS repo at `github.com/mohan-sanjana/aisle` |
 | 7 | Pilot cohort | Sanjana handles recruiting separately · 3 live 30-minute interviews using Appendix A script as Phase 1 launch gate |
 
 ---

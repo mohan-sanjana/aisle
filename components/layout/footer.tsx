@@ -9,7 +9,7 @@ export function Footer() {
         </p>
         <p className="flex items-center gap-4">
           <a
-            href="https://github.com/sanjana-mohan/aisle"
+            href="https://github.com/mohan-sanjana/aisle"
             className="text-slate-600 hover:text-brand-700"
             target="_blank"
             rel="noreferrer noopener"
