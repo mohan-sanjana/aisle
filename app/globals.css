@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Aisle design tokens — light mode only (Phase 1 explicitly excludes dark mode). */
+:root {
+  /* Forest green accent. RGB triplets for use with Tailwind's <alpha-value> syntax. */
+  --brand-50: 240 253 244; /* green-50 */
+  --brand-100: 220 252 231; /* green-100 */
+  --brand-600: 22 163 74; /* green-600 — reserve for success status */
+  --brand-700: 21 128 61; /* green-700 — primary actions */
+  --brand-800: 22 101 52; /* green-800 — hover */
+
+  /* Neutrals */
+  --background: 255 255 255;
+  --foreground: 15 23 42; /* slate-900 */
+  --muted: 248 250 252; /* slate-50 */
+  --muted-foreground: 71 85 105; /* slate-600 */
+  --border: 226 232 240; /* slate-200 */
+
+  /* Status */
+  --warning: 220 38 38; /* red-600 */
+  --success: 5 150 105; /* emerald-600 */
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-white text-slate-900;
+    font-family: var(--font-inter), system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  h1 {
+    @apply text-h1;
+  }
+
+  h2 {
+    @apply text-h2;
+  }
+
+  h3 {
+    @apply text-h3;
+  }
+
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+    font-size: 14px;
+  }
+
+  hr {
+    @apply border-slate-200;
+  }
+}
+
+@layer components {
+  .container-prose {
+    @apply mx-auto w-full max-w-3xl px-4;
+  }
+}
