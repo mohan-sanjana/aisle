@@ -1,0 +1,73 @@
+/* Sizer-specific styles, including print rules. */
+
+/* Hide all chrome/navigation in print, leaving the inputs summary + scenarios. */
+@media print {
+  /* Hide stepper, wizard buttons, export buttons, breadcrumb, header, footer. */
+  .no-print,
+  header[aria-label="Aisle home"],
+  nav[aria-label="Primary"],
+  nav[aria-label="Sizer wizard"],
+  nav[aria-label="Breadcrumb"],
+  aside[aria-label="Sizer wizard"],
+  body > footer {
+    display: none !important;
+  }
+
+  /* Force the live-results panel to flow naturally instead of staying sticky. */
+  aside[aria-label="Live result"] {
+    position: static !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* Stack scenario cards vertically when printing for legibility. */
+  .scenario-grid {
+    display: block !important;
+  }
+  .scenario-grid > * {
+    margin-bottom: 1rem;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Neutral colours; drop brand tinted backgrounds for ink-friendly output. */
+  .scenario-card {
+    background: white !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+  }
+  .scenario-card .bg-brand-50 {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+  }
+  .scenario-card .text-brand-800 {
+    color: #0f172a !important;
+  }
+
+  /* Expand grid layout to a single column. */
+  .container {
+    max-width: 100% !important;
+  }
+
+  /* Avoid awkward breaks inside dl rows. */
+  dl,
+  section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Crisper text on paper. */
+  body {
+    color: #0f172a !important;
+    background: white !important;
+  }
+
+  a[href]::after {
+    /* don't append URLs after links — keeps the print tidy */
+    content: "";
+  }
+}
+
+/* No accordion animation needed — Radix's AccordionContent uses
+ * `display: none` for closed and natural flow for open. The content has
+ * `overflow: hidden`, so toggle is instant but visually clean. */
