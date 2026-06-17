@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowRight, BookOpen, Calculator, Layers, Network } from "lucide-react";
 
+import { HeroIllustration } from "./_components/hero-illustration";
+
 /**
  * Four primary entry points, each describing a *kind of visitor* rather than
  * a step. Visitors self-categorize and pick where to start; no forced
@@ -58,23 +60,28 @@ const entryPoints: ReadonlyArray<EntryPoint> = [
 
 export default function Home() {
   return (
-    <div className="container mx-auto px-4 py-16 sm:py-20">
+    <div className="container mx-auto px-4 py-14 sm:py-20">
       {/* ─── Hero ──────────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-3xl text-center">
-        <p className="inline-block rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-800">
-          Learn. Plan. Design.
-        </p>
-        <h1 className="mt-5 text-balance text-h1 font-bold tracking-tight text-slate-900">
-          Plan on-prem AI inference infrastructure with confidence.
-        </h1>
-        <p className="mt-6 text-balance text-lg leading-relaxed text-slate-700">
-          Aisle is the planning workbench for IT teams. Walk every layer of the
-          inference stack, from GPU memory to facility power, and build a
-          sizing you can defend.
-        </p>
-        <p className="mt-4 text-xs text-slate-500">
-          Open source · Vendor neutral · Runs in your browser
-        </p>
+      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-[1fr_minmax(0,520px)] lg:gap-14">
+        <div className="text-center lg:text-left">
+          <p className="inline-block rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-800">
+            Learn. Plan. Design.
+          </p>
+          <h1 className="mt-5 text-balance text-h1 font-bold tracking-tight text-slate-900">
+            Plan on-prem AI inference infrastructure with confidence.
+          </h1>
+          <p className="mt-6 text-balance text-lg leading-relaxed text-slate-700">
+            Aisle is the planning workbench for IT teams. Walk every layer of
+            the inference stack, from GPU memory to facility power, and build a
+            sizing you can defend.
+          </p>
+          <p className="mt-4 text-xs text-slate-500">
+            Open source · Vendor neutral · Runs in your browser
+          </p>
+        </div>
+        <div className="flex justify-center lg:justify-end">
+          <HeroIllustration className="w-full max-w-[520px]" />
+        </div>
       </section>
 
       {/* ─── Three entry points ────────────────────────────────────────── */}
