@@ -19,12 +19,21 @@ type ComponentMap = Record<string, ComponentType<Record<string, unknown>>>;
  *
  *   <GlossaryTerm id="kv_cache">KV cache</GlossaryTerm> with a hover tooltip.
  */
+export const MDX_COMPONENT_MAP: ComponentMap = {
+  Callout: Callout as ComponentType<Record<string, unknown>>,
+  GlossaryTerm: GlossaryTerm as ComponentType<Record<string, unknown>>,
+  KnowledgeMermaid: KnowledgeMermaid as ComponentType<Record<string, unknown>>,
+  TryInSizer: TryInSizer as ComponentType<Record<string, unknown>>,
+};
+
+/**
+ * Next.js convention export. Kept so any auto-injection path that looks for
+ * `useMDXComponents` still resolves. Functionally equivalent to spreading
+ * MDX_COMPONENT_MAP after the incoming components.
+ */
 export function useMDXComponents(components: ComponentMap): ComponentMap {
   return {
     ...components,
-    Callout: Callout as ComponentType<Record<string, unknown>>,
-    GlossaryTerm: GlossaryTerm as ComponentType<Record<string, unknown>>,
-    KnowledgeMermaid: KnowledgeMermaid as ComponentType<Record<string, unknown>>,
-    TryInSizer: TryInSizer as ComponentType<Record<string, unknown>>,
+    ...MDX_COMPONENT_MAP,
   };
 }

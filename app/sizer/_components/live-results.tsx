@@ -47,7 +47,7 @@ export function LiveResults({ input }: { input: SizerInput }) {
 
       <SummaryPanel input={input} output={output} />
 
-      <DeploymentSchematic input={input} output={output} />
+      <DeploymentSchematic output={output} />
 
       <div className="scenario-grid grid grid-cols-1 gap-4 xl:grid-cols-3">
         <ScenarioCard scenario={output.scenarios.baseline} />

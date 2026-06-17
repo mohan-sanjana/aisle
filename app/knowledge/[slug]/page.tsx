@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { MDXRemote } from "next-mdx-remote/rsc";
 
-import { useMDXComponents } from "@/mdx-components";
+import { MDX_COMPONENT_MAP } from "@/mdx-components";
 import { MODULES, getModule, moduleFilename } from "@/content/knowledge/modules";
 
 import { ModuleHeader } from "../_components/module-header";
@@ -42,7 +42,6 @@ export default async function KnowledgeModulePage({
   // next-mdx-remote compile + render with the registered components.
   const filepath = path.join(process.cwd(), moduleFilename(m));
   const source = await readFile(filepath, "utf-8");
-  const components = useMDXComponents({});
 
   return (
     <article className="max-w-3xl">
@@ -54,7 +53,7 @@ export default async function KnowledgeModulePage({
       />
 
       <div className="prose prose-lg prose-slate max-w-[70ch]">
-        <MDXRemote source={source} components={components} />
+        <MDXRemote source={source} components={MDX_COMPONENT_MAP} />
       </div>
 
       <ModuleNav currentSlug={slug} />

@@ -16,12 +16,6 @@ import type { ScenarioOutput, SizerInput, SizerOutput } from "../types";
 // Helpers
 // ──────────────────────────────────────────────────────────────────────────────
 
-/** Returns true if actual is within ±tolerance fraction of expected. */
-function withinTolerance(actual: number, expected: number, tolerance = 0.1) {
-  if (expected === 0) return actual === 0;
-  return Math.abs(actual - expected) / expected <= tolerance;
-}
-
 function gpuFamily(gpu_id: string): "L40S" | "L4" | "H100" | "H200" | "B100" | "B200" | "GB200" | "A100" | "MI300X" | "MI325X" | "unknown" {
   if (gpu_id.includes("l40s")) return "L40S";
   if (gpu_id.includes("l4") && !gpu_id.includes("l40")) return "L4";

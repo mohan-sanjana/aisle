@@ -46,7 +46,6 @@ import { bytesPerParam, weightsMemoryGB } from "./steps/weights";
 import { totalVramGB } from "./steps/vram";
 import type {
   ResolvedModelConfig,
-  ScenarioName,
   ScenarioOutput,
   ScenarioParams,
   SizerAssumptions,
@@ -126,7 +125,7 @@ function resolveModel(input: SizerInput): ResolvedModelConfig {
     };
   }
 
-  const generic = genericArchitectureDefaults(input.parameter_count_b, input.model_architecture);
+  const generic = genericArchitectureDefaults(input.parameter_count_b);
   const activeParamsB =
     input.model_architecture === "moe"
       ? (input.active_params_b ?? input.parameter_count_b)

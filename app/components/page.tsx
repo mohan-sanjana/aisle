@@ -245,8 +245,8 @@ export default function ComponentsOverviewPage() {
         </p>
         <p className="mt-2 leading-relaxed">
           Optimization techniques (FP8 quantization, continuous batching,
-          PagedAttention, speculative decoding, LoRA, prefix caching) aren't a
-          stack layer. They are configuration choices applied <em>within</em>{" "}
+          PagedAttention, speculative decoding, LoRA, prefix caching)
+          aren&rsquo;t a stack layer. They are configuration choices applied <em>within</em>{" "}
           the serving engine, not components you assemble. They show up in two
           places in Aisle: as inputs in the{" "}
           <Link

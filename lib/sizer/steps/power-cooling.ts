@@ -20,14 +20,6 @@ import {
 } from "../constants";
 import type { CoolingSpec, PowerSpec } from "../types";
 
-/** Servers per rack ceiling. Limited by power (typically 4-10 in modern racks). */
-function serversPerRack(serverKw: number, coolingMaxKwPerRack: number): number {
-  // Default: 10 servers/rack physical limit; tighter when power-bound.
-  const physicalMax = 10;
-  const byPower = Math.max(1, Math.floor(coolingMaxKwPerRack / Math.max(serverKw, 0.1)));
-  return Math.min(physicalMax, byPower);
-}
-
 export function computePower(args: {
   accelerator: Accelerator;
   gpu_count_per_replica: number;

@@ -190,10 +190,13 @@ export function getModelFamily(id: string): ModelFamilyDefaults | undefined {
 /**
  * Generic architecture defaults when no family is known. Used as a sane
  * fallback so the calc engine never crashes on missing metadata.
+ *
+ * Note: layer counts are based on parameter count only. Architecture-specific
+ * defaults (dense vs MoE vs GQA) currently use the same table; if that ever
+ * needs to diverge, add a parameter back here.
  */
 export function genericArchitectureDefaults(
   paramCountB: number,
-  architecture: ModelArchitecture,
 ): { layers: number; kv_heads: number; head_dim: number } {
   // Layer count scales roughly with sqrt(params) — these are rough, sized to
   // land in the right ballpark for sizing math.

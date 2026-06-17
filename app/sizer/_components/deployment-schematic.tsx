@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 
-import type { ScenarioOutput, SizerInput, SizerOutput } from "@/lib/sizer/types";
+import type { ScenarioOutput, SizerOutput } from "@/lib/sizer/types";
 
 /**
  * Educational "deployment at a glance" schematic.
@@ -32,10 +32,8 @@ const SERVER_GAP = 12;
 const OVERFLOW_W = 84;
 
 export function DeploymentSchematic({
-  input,
   output,
 }: {
-  input: SizerInput;
   output: SizerOutput;
 }) {
   const burst = output.scenarios.burst;
