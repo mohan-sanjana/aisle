@@ -93,6 +93,17 @@ export const MODULES: ReadonlyArray<ModuleMeta> = [
     reading_time_minutes: 4,
     prerequisites: ["worked-example"],
   },
+  {
+    slug: "optimization-techniques",
+    index: 8,
+    title: "Optimization techniques",
+    summary:
+      "The AI team's six big levers. Quantization, batching, caching, LoRA, speculative decoding. What each does, how much it changes the math, when to use it.",
+    learning_objective:
+      "Identify the six major LLM inference optimization techniques, understand the throughput and memory impact of each, and know when each one is worth adopting in a deployment.",
+    reading_time_minutes: 7,
+    prerequisites: ["it-ai-conversation"],
+  },
 ];
 
 export function getModule(slug: string): ModuleMeta | undefined {
