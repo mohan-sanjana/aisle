@@ -2,12 +2,21 @@ import Link from "next/link";
 import { ArrowRight, BookOpen, Calculator, Layers, Network } from "lucide-react";
 
 /**
- * Three primary entry points, each describing a *kind of visitor* rather than
+ * Four primary entry points, each describing a *kind of visitor* rather than
  * a step. Visitors self-categorize and pick where to start; no forced
- * sequence. Designer is intentionally not an entry point — it's used after a
- * sizing exists, so it appears in the "what's inside" section below.
+ * sequence. Designer is flagged as `comingSoon` until the rule engine ships.
  */
-const entryPoints = [
+type EntryPoint = {
+  href: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  cta: string;
+  icon: typeof BookOpen;
+  comingSoon?: boolean;
+};
+
+const entryPoints: ReadonlyArray<EntryPoint> = [
   {
     href: "/knowledge",
     eyebrow: "New to AI infrastructure?",
@@ -35,13 +44,16 @@ const entryPoints = [
     cta: "Explore components",
     icon: Layers,
   },
-];
-
-const allSections = [
-  { href: "/knowledge", label: "Learn", purpose: "Eight-module curriculum on AI inference and infrastructure planning.", icon: BookOpen },
-  { href: "/components", label: "Explore", purpose: "Six-layer infrastructure stack and worked example deployments.", icon: Layers },
-  { href: "/sizer", label: "Plan", purpose: "Guided workload sizing across three scenarios.", icon: Calculator },
-  { href: "/designer", label: "Design", purpose: "Deployment topology and architecture archetypes.", icon: Network },
+  {
+    href: "/designer",
+    eyebrow: "Already have a sizing?",
+    title: "Visualize the topology.",
+    description:
+      "Turn a sizing into a deployment archetype with a topology diagram. Picks between single-node, multi-GPU, and multi-node TP+PP patterns based on your inputs.",
+    cta: "Open Designer",
+    icon: Network,
+    comingSoon: true,
+  },
 ];
 
 export default function Home() {
@@ -83,13 +95,18 @@ export default function Home() {
           </p>
         </header>
 
-        <ol className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {entryPoints.map(({ href, eyebrow, title, description, cta, icon: Icon }) => (
+        <ol className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {entryPoints.map(({ href, eyebrow, title, description, cta, icon: Icon, comingSoon }) => (
             <li key={href}>
               <Link
                 href={href}
-                className="group flex h-full flex-col rounded-lg border border-slate-200 bg-white p-5 transition-colors hover:border-brand-700 hover:bg-brand-50/40"
+                className="group relative flex h-full flex-col rounded-lg border border-slate-200 bg-white p-5 transition-colors hover:border-brand-700 hover:bg-brand-50/40"
               >
+                {comingSoon && (
+                  <span className="absolute right-4 top-4 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800">
+                    Coming soon
+                  </span>
+                )}
                 <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-brand-50 text-brand-700 group-hover:bg-brand-100">
                   <Icon className="h-5 w-5" aria-hidden="true" />
                 </div>
@@ -112,46 +129,6 @@ export default function Home() {
         </ol>
       </section>
 
-      {/* ─── What's inside (reference index of all four sections) ──────── */}
-      <section
-        aria-labelledby="inside-heading"
-        className="mx-auto mt-20 max-w-5xl"
-      >
-        <header className="mb-5">
-          <h2
-            id="inside-heading"
-            className="text-base font-semibold uppercase tracking-wider text-slate-500"
-          >
-            What&rsquo;s inside
-          </h2>
-        </header>
-        <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
-          {allSections.map(({ href, label, purpose, icon: Icon }) => (
-            <div
-              key={href}
-              className="flex items-start gap-3 border-l-2 border-slate-200 pl-4"
-            >
-              <Icon
-                aria-hidden="true"
-                className="mt-0.5 h-4 w-4 shrink-0 text-brand-700"
-              />
-              <div>
-                <dt>
-                  <Link
-                    href={href}
-                    className="text-sm font-semibold text-slate-900 hover:text-brand-800"
-                  >
-                    {label}
-                  </Link>
-                </dt>
-                <dd className="mt-0.5 text-sm leading-relaxed text-slate-600">
-                  {purpose}
-                </dd>
-              </div>
-            </div>
-          ))}
-        </dl>
-      </section>
     </div>
   );
 }
