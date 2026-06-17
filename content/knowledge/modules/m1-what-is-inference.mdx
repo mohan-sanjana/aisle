@@ -1,0 +1,53 @@
+When IT teams are first asked to "stand up some GPUs for the AI team," the request usually arrives without a vocabulary. There's a model. The team wants to run it. How hard could it be? It turns out the answer depends almost entirely on a single word: *inference*. Get that word right, and the rest of the planning is a different but learnable game. Get it wrong, and you can spend a million dollars on infrastructure that does the wrong job.
+
+## Two activities, very different infrastructure
+
+Modern AI systems do two fundamentally distinct things, and they look almost nothing alike from an infrastructure perspective.
+
+<GlossaryTerm id="training">Training</GlossaryTerm> is the process of teaching a model. You take a vast dataset, often the entire public internet, and run gradient descent over it for weeks or months on thousands of GPUs. Training a model the size of Llama 3.1 70B takes on the order of a million GPU-hours. It is the most expensive thing humans do with computers, and it happens once per major model release. Almost no enterprise trains models from scratch. The few that do operate at the frontier (Anthropic, OpenAI, Meta, Google), and they run infrastructure measured in *gigawatts*, not megawatts.
+
+<GlossaryTerm id="inference">Inference</GlossaryTerm> is what happens every time you actually *use* the model. Every chat message, every code completion, every document summary. The model's weights are fixed; you feed it some input, and it produces output. A single inference takes milliseconds to seconds, not weeks. But unlike training, you do it millions of times a day.
+
+The analogy that helps most people: training is like writing a book, and inference is reading it aloud. Different time scales, different purposes, very different infrastructure.
+
+<Callout variant="key">
+For 95% of enterprises, **inference is the only AI workload you'll run on-prem**. The rest of this curriculum focuses on inference; training is a separate (much larger) conversation.
+</Callout>
+
+## The wider AI workload landscape
+
+It helps to know where inference sits among its neighbors. Five recognized categories of AI workload, in rough order of cost and rarity:
+
+- **Training.** Building a model from scratch. Weeks to months on a frontier cluster. Done by model vendors.
+- **<GlossaryTerm id="fine_tuning">Fine-tuning</GlossaryTerm>.** Specializing a pre-trained model on a smaller, custom dataset. Hours to days on a much smaller cluster. Some enterprises do this; many use LoRA adapters as a lighter alternative.
+- **Inference.** Running the model against real requests. Milliseconds per request, but at potentially millions of requests a day. This is the workload most enterprises stand up.
+- **Embeddings.** A special kind of inference that turns text or images into vectors for search. Far cheaper per call than a full LLM inference, but volume can be large.
+- **Retrieval (RAG).** Not strictly an AI workload, but tightly coupled to inference. A vector database (built from embeddings) is searched on every request to inject relevant context into the prompt.
+
+Inference is the cornerstone. Embeddings feed it, retrieval supports it, and fine-tuning adapts the model it serves. When the AI team says "we want to deploy a model," what they mean is: *we want to serve inference*.
+
+## Why on-prem, why now
+
+For a few years, "use the API" was a complete answer. OpenAI, Anthropic, and Google offer hosted inference; tokens come out of the wire, your data goes in. For prototypes and many production workloads, that's still the right answer.
+
+On-prem inference exists for a small number of concrete reasons, usually two or three at once:
+
+- **Data residency.** Healthcare, finance, defense, and EU public-sector workloads often cannot send prompts to a US cloud API. Inference must happen inside the organization's boundary.
+- **Cost at scale.** Once you're past a few billion tokens a month, owned infrastructure becomes cheaper than API-billed inference. The crossover depends on your model and utilization, but the rule of thumb is roughly $1–2M per year of API spend.
+- **Latency and locality.** Agentic workflows that make twenty tool calls per turn want millisecond round-trips. The closest cloud region is sometimes too far.
+- **Model choice.** Not every model is available via a hosted API. If you need the latest open-weight release at FP8, you may be running it yourself.
+
+Aisle is the planning tool for the moment you've decided the answer is on-prem.
+
+## What makes inference unlike anything you've planned before
+
+Here's the surprise: inference looks deceptively simple from the outside. There's a model. You send it a prompt. It sends back a response. You might assume capacity planning means stacking up enough GPUs to handle the request volume, the same way you size a database for QPS.
+
+It doesn't work that way. A single user with a long conversation can hold gigabytes of GPU memory hostage just for that one session. A model that fits comfortably on one GPU at one precision needs eight at another. The bottleneck is rarely compute; it is how fast the GPU can read its own memory. Power draw is two or three times what a comparable rack of CPU servers would pull. And the choices that the AI team makes (which model, what context length, which serving engine, what quantization) can swing the infrastructure budget by an order of magnitude.
+
+The next module names the four specific assumptions in traditional infrastructure planning that inference breaks, before getting into the mechanics. If you skip ahead, the rest of the curriculum will give you the vocabulary to plan honestly, the math to size confidently, and the checklist to have a productive conversation with the AI team standing next to you.
+
+<TryInSizer
+  prompt="Open the Sizer with the default 70B Llama RAG workload to get a feel for what the output looks like, then come back."
+  params={{}}
+/>

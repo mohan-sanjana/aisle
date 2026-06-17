@@ -93,6 +93,8 @@ export function getServingEngineById(id: string): ServingEngine | undefined {
 export type {
   Accelerator,
   Catalog,
+  CatalogCategory,
+  CatalogEntry,
   NetworkingComponent,
   Optimization,
   PowerCoolingTier,

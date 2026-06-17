@@ -1,0 +1,52 @@
+/* Components-section styles. Mostly print rules so the React Flow diagrams
+ * and prose render cleanly when the user picks "Print" from a workload page.
+ * Note: PNG/SVG export is deferred for Phase 1 — Print is the supported path.
+ */
+
+@media print {
+  /* Hide chrome and navigation. */
+  .no-print,
+  header[aria-label="Aisle home"],
+  nav[aria-label="Primary"],
+  nav[aria-label="Breadcrumb"],
+  nav[aria-label="Infrastructure components"],
+  aside[aria-label="Infrastructure components"],
+  body > footer {
+    display: none !important;
+  }
+
+  /* Reset two-column flex so prose flows the full page width. */
+  .container {
+    max-width: 100% !important;
+  }
+
+  /* React Flow viewport: lock to a fixed height that prints on one page. */
+  .topology-print-frame {
+    height: auto !important;
+    min-height: 360px !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Hide React Flow control widgets in print. */
+  .react-flow__controls,
+  .react-flow__minimap,
+  .react-flow__attribution,
+  .react-flow__panel {
+    display: none !important;
+  }
+
+  /* Hide hover popovers/tooltips entirely on paper. */
+  [role="tooltip"] {
+    display: none !important;
+  }
+
+  body {
+    color: #0f172a !important;
+    background: white !important;
+  }
+
+  a[href]::after {
+    content: "";
+  }
+}
