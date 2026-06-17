@@ -16,10 +16,13 @@ export function TryInSizer({
   title?: string;
   prompt: string;
   /** URL-state codec keys; see app/sizer/_lib/url-state.ts. */
-  params: Partial<Record<SizerUrlKey, string | number>>;
+  params?: Partial<Record<SizerUrlKey, string | number>>;
 }) {
+  // Guard for undefined / null. next-mdx-remote v6 sometimes serializes
+  // `params={{}}` from MDX as undefined when the object has no keys.
+  const safeParams = params ?? {};
   const qs = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
+  for (const [k, v] of Object.entries(safeParams)) {
     if (v === undefined || v === null) continue;
     qs.set(k, String(v));
   }
