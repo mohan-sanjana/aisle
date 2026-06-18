@@ -71,9 +71,9 @@ export function HeroWidget() {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
       {/* Header */}
-      <header className="mb-3 flex items-center justify-between gap-3">
+      <header className="mb-2.5 flex items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
           <Zap className="h-4 w-4 text-brand-700" aria-hidden="true" />
           What happens when AI generates one token?
@@ -91,7 +91,7 @@ export function HeroWidget() {
       </header>
 
       {/* Main flow: 3 step boxes + GPU card, arrows between */}
-      <div className="mb-2 grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1.6fr] items-center gap-1.5">
+      <div className="mb-2.5 grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1.6fr] items-center gap-1.5">
         <StepBox
           icon={<MessageSquare className="h-4 w-4" aria-hidden="true" />}
           label="User"
@@ -116,53 +116,45 @@ export function HeroWidget() {
         <GpuCard kvFraction={kvFraction} pulse={pulse} />
       </div>
 
-      {/* "Next token" loop indicator */}
-      <div className="mb-3 flex items-center gap-2 text-[10px] italic text-slate-400">
-        <span className="h-px flex-1 border-t border-dashed border-slate-300" />
-        <span>Next token loops back to GPU</span>
-        <span className="h-px flex-1 border-t border-dashed border-slate-300" />
-      </div>
-
-      {/* Token stream display */}
-      <div className="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-          Prompt
-        </p>
-        <p className="font-mono text-[13px] text-slate-700">
-          What is the capital of France?
-        </p>
-        <p className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-brand-700">
-          Generated
-        </p>
-        <p className="min-h-[20px] font-mono text-[13px] text-slate-900">
-          {currentText}
-          {!atEnd && (
-            <span className="ml-0.5 animate-pulse text-brand-700">|</span>
-          )}
-        </p>
+      {/* Token stream display: compact inline labels */}
+      <div className="mb-2.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+        <div className="flex items-baseline gap-2">
+          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            Prompt
+          </span>
+          <span className="truncate font-mono text-[12px] text-slate-700">
+            What is the capital of France?
+          </span>
+        </div>
+        <div className="mt-1 flex items-baseline gap-2">
+          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-brand-700">
+            Output
+          </span>
+          <span className="min-h-[16px] truncate font-mono text-[12px] text-slate-900">
+            {currentText || <span className="text-slate-400">(empty)</span>}
+            {!atEnd && (
+              <span className="ml-0.5 animate-pulse text-brand-700">|</span>
+            )}
+          </span>
+        </div>
       </div>
 
       {/* Generate / Reset button */}
       <button
         type="button"
         onClick={atEnd ? handleReset : handleGenerate}
-        className="mb-3 w-full rounded-md bg-brand-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-800"
+        className="mb-2.5 w-full rounded-md bg-brand-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800"
       >
         {atEnd ? "Reset" : "Generate next token"}
       </button>
 
-      {/* Insight card */}
-      <aside className="rounded-md border-l-4 border-brand-700 bg-brand-50/60 px-3 py-2.5">
-        <p className="text-[13px] leading-relaxed text-slate-700">
-          Every generated token requires repeatedly reading the model weights
-          and KV cache from GPU memory.
+      {/* Insight card: single sentence, meters inline */}
+      <aside className="rounded-md border-l-4 border-brand-700 bg-brand-50/60 px-3 py-2">
+        <p className="text-[12px] font-semibold leading-snug text-slate-900">
+          Each token re-reads the model from memory. The bottleneck is{" "}
+          <span className="text-brand-700">memory bandwidth</span>, not compute.
         </p>
-        <p className="mt-1 text-[13px] font-semibold leading-relaxed text-slate-900">
-          The bottleneck is{" "}
-          <span className="text-brand-700">memory bandwidth</span>, not
-          compute.
-        </p>
-        <div className="mt-2.5 grid grid-cols-2 gap-3">
+        <div className="mt-2 grid grid-cols-2 gap-3">
           <Meter label="Memory bandwidth" value={bwValue} highlight />
           <Meter label="Compute" value={35} />
         </div>

@@ -60,7 +60,7 @@ const entryPoints: ReadonlyArray<EntryPoint> = [
 
 export default function Home() {
   return (
-    <div className="container mx-auto px-4 py-14 sm:py-20">
+    <div className="container mx-auto px-4 py-8 sm:py-12">
       {/* ─── Hero ──────────────────────────────────────────────────────── */}
       <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-[1fr_minmax(0,540px)] lg:gap-14">
         <div className="text-center lg:text-left">
@@ -87,9 +87,9 @@ export default function Home() {
       {/* ─── Three entry points ────────────────────────────────────────── */}
       <section
         aria-labelledby="entry-heading"
-        className="mx-auto mt-20 max-w-5xl"
+        className="mx-auto mt-10 max-w-5xl"
       >
-        <header className="mb-6 text-center">
+        <header className="mb-5 text-center">
           <h2
             id="entry-heading"
             className="text-2xl font-semibold tracking-tight text-slate-900"
