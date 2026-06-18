@@ -146,10 +146,14 @@ describe("TC2 — Llama 3.3-70B RAG chatbot (sizing-math §6)", () => {
     expect(s.replica_count).toBeLessThanOrEqual(20);
   });
 
-  it("provisions InfiniBand or RoCE fabric (multi-node deployment)", () => {
+  it("uses 100 GbE frontend (replicas are independent, fit in one chassis via NVLink)", () => {
     const s = pickScenario(sizeWorkload(input));
-    // 14 replicas × 2 GPUs = 28 GPUs spread across multiple nodes → premium fabric.
-    expect(s.fabric.type.toLowerCase()).toMatch(/infiniband|roce|ndr|xdr|400|800/);
+    // Each replica is 2× H200 inside one chassis (NVLink intra-node).
+    // No inter-node tensor or pipeline parallelism, so no backend fabric is
+    // needed; 100 GbE frontend carries client traffic. This corrects an
+    // earlier test that expected InfiniBand because the engine (incorrectly)
+    // landed on 4× A100 per replica before the precision gate was added.
+    expect(s.fabric.type.toLowerCase()).toMatch(/100|gbe|ethernet|frontend/);
   });
 
   it("cooling tier is RDHX or denser (rack power > 12 kW likely)", () => {
@@ -195,9 +199,12 @@ describe("TC3 — Llama 3.1-405B multi-node (sizing-math §6)", () => {
     expect(s.server_spec.gpu_count).toBe(8);
   });
 
-  it("provisions premium InfiniBand fabric (multi-node)", () => {
+  it("does not need an inter-node fabric (8-GPU TP fits in one chassis)", () => {
     const s = pickScenario(sizeWorkload(input));
-    expect(s.fabric.type.toLowerCase()).toMatch(/infiniband|ndr|xdr|400|800/);
+    // After fixing `llama-3.1-405b` kv_heads from 16 to 8 (Round 1, Finding 2),
+    // per-request KV halved and the model now fits comfortably in 8× H200 in
+    // one chassis. No pipeline parallelism, no inter-node fabric.
+    expect(s.fabric.type.toLowerCase()).toMatch(/100|gbe|ethernet|frontend/);
   });
 
   it("recommends 5–10 replicas depending on accelerator", () => {
@@ -294,9 +301,14 @@ describe("TC5 — Low-concurrency local 13B (sizing-math §6)", () => {
     expect(["L40S", "L4", "H100"]).toContain(family);
   });
 
-  it("uses one GPU per replica", () => {
+  it("uses one GPU per logical replica (server may pack multiple via consolidation)", () => {
     const s = pickScenario(sizeWorkload(input));
-    expect(s.server_spec.gpu_count).toBe(1);
+    // server_spec.gpu_count is GPUs per physical server (post-consolidation),
+    // not per logical replica. For PCIe SKUs (L40S, L4), the engine packs
+    // multiple single-GPU replicas into a single chassis. The right check is
+    // gpus_per_server / replicas_per_server == 1 GPU per replica.
+    const gpuPerReplica = s.server_spec.gpu_count / s.replicas_per_server;
+    expect(gpuPerReplica).toBe(1);
   });
 
   it("recommends 2–4 replicas (N+1 over 2 active)", () => {
