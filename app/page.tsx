@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, BookOpen, Calculator, Layers, Network } from "lucide-react";
 
-import { HeroIllustration } from "./_components/hero-illustration";
+import { HeroWidget } from "./_components/hero-widget";
 
 /**
  * Four primary entry points, each describing a *kind of visitor* rather than
@@ -62,7 +62,7 @@ export default function Home() {
   return (
     <div className="container mx-auto px-4 py-14 sm:py-20">
       {/* ─── Hero ──────────────────────────────────────────────────────── */}
-      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-[1fr_minmax(0,520px)] lg:gap-14">
+      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-[1fr_minmax(0,620px)] lg:gap-14">
         <div className="text-center lg:text-left">
           <p className="inline-block rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-800">
             Learn. Plan. Design.
@@ -79,8 +79,8 @@ export default function Home() {
             Open source · Vendor neutral · Runs in your browser
           </p>
         </div>
-        <div className="flex justify-center lg:justify-end">
-          <HeroIllustration className="w-full max-w-[520px]" />
+        <div className="flex w-full justify-center lg:justify-end">
+          <HeroWidget />
         </div>
       </section>
 
