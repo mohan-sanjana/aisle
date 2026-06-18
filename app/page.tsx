@@ -62,7 +62,7 @@ export default function Home() {
   return (
     <div className="container mx-auto px-4 py-14 sm:py-20">
       {/* ─── Hero ──────────────────────────────────────────────────────── */}
-      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-[1fr_minmax(0,620px)] lg:gap-14">
+      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-[1fr_minmax(0,540px)] lg:gap-14">
         <div className="text-center lg:text-left">
           <p className="inline-block rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-800">
             Learn. Plan. Design.
