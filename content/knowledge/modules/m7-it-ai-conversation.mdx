@@ -1,1 +1,91 @@
-*Module 7 content coming next turn.*
+The first six modules built the vocabulary and walked the math. This module is the operating manual: what the planning meeting looks like, who answers which question, and which moments to slow down on.
+
+Treat the structure here as a working checklist. Print it, paste it into a doc, bring it to the kickoff. Every successful AI infrastructure rollout has had a version of this conversation. The teams that skip it ship hardware that does the wrong job and discover the gap in production.
+
+## Who owns which decision
+
+Three roles show up in the planning conversation. The boundaries matter because each role has different leverage on the answer.
+
+The **application owner** is the person who wants the system to exist. They own the use case, the user population, the SLOs, and the redundancy posture. Their decisions: which use case (chat, RAG, agent, batch), how many users, what latency the application actually needs, and what level of redundancy is required for the business.
+
+The **AI team** owns the model, the serving stack, and the precision. Their decisions: which model (size, architecture, family), which precision to serve at, which serving engine, which optimizations to enable.
+
+The **IT team** owns the hardware and the facility. Their decisions: which GPU SKU, how many, what fabric, how much power and cooling. None of these can be decided in a vacuum, which is why the meeting exists.
+
+<Callout variant="key">
+The seven sizing inputs split cleanly across the three roles. Application owner: concurrent users, RPS, latency targets, burst factor, redundancy. AI team: model size, precision, serving engine, optimizations. IT team: GPU SKU, fabric, power, cooling. The IT team owns the *output* of sizing, but only when the other two roles have signed off on the inputs.
+</Callout>
+
+## Questions to ask the AI team
+
+Bring these to the kickoff. They map directly to the seven parameters from M5.
+
+1. **Which model exactly?** Get the full name, not just the size. "Llama 3.3-70B" is different from "Llama 3.1-405B" is different from "Mixtral 8x22B." The KV constants change, the architecture changes, the throughput changes.
+
+2. **What precision are you serving at?** The expected answer in 2026 is FP8 on Hopper or Blackwell hardware. If it is anything else, ask why.
+
+3. **What is the actual context length the application uses on average, not the max?** Most applications use 4-8K out of a 32K or 128K max. Sizing against the max is the most common cause of over-provisioning.
+
+4. **What is your peak concurrent in-flight request count?** Not total users. Not RPS. The number of requests the system is processing at one time during the peak hour.
+
+5. **What is the realistic TTFT and TPOT the application needs?** Not the aspirational targets. Push back on "as fast as possible." Every 50 ms shaved off TPOT costs real money.
+
+6. **Are continuous batching, PagedAttention, and prefix caching enabled?** All three should be yes if the AI team is using a modern serving engine. If any are no, find out why.
+
+7. **Is speculative decoding in scope?** If yes, expected throughput goes up roughly 2x. The replica count drops accordingly.
+
+8. **What is the rollout plan for fine-tuned variants?** If multiple variants are coming, LoRA adapters keep them on one shared deployment instead of fragmenting capacity.
+
+## Questions the AI team will ask back
+
+Three of these will come up. Have an answer ready.
+
+**"Do you have the power and cooling envelope to run this?"** Know your rack power feeds and cooling tier. A 5-replica DGX B200 deployment needs roughly 70 kW IT load and direct liquid cooling. If the facility tops out at 35 kW per rack with rear-door HX, that constrains the SKU choice before the math starts.
+
+**"What is the maintenance window for GPU firmware and driver updates?"** GPU firmware and the CUDA stack ship updates more frequently than enterprise IT typically handles. Establish a cadence early. Quarterly is reasonable for most enterprises.
+
+**"Can we get a development cluster that mirrors production?"** The answer often has to be no in a budget-constrained shop, and the workaround (smaller dev GPUs that mimic the production stack) needs early agreement.
+
+## Red flags to surface early
+
+Five patterns recur. Each one looks innocuous in the kickoff and breaks the plan two months later.
+
+<Callout variant="pitfall">
+**"We are going to size against the max context."** This over-provisions by 3x or more. The realistic average is what matters for steady-state capacity. Treat the max as a guardrail, not a sizing input.
+</Callout>
+
+<Callout variant="pitfall">
+**"We will run on A100s because that is what we have."** A100 cannot do FP8. If the AI team wants FP8 (and in 2026 they should), the hardware choice has to change. Have the precision conversation before the hardware conversation.
+</Callout>
+
+<Callout variant="pitfall">
+**"We will autoscale during bursts."** Autoscaling is a cloud concept. On-prem deployments with fixed hardware effectively size to the peak. The right conversation is about acceptable degradation during a burst, not whether the hardware will appear from somewhere.
+</Callout>
+
+<Callout variant="pitfall">
+**"We need it as fast as possible."** No application needs unbounded latency improvement. Pin the TPOT and TTFT to a number that comes from the application's user experience, not from a benchmark. A TPOT of 20 ms instead of 40 ms can double the GPU count.
+</Callout>
+
+<Callout variant="pitfall">
+**"We can decide on the model later."** No, you cannot. The model size, architecture, and precision change the recommendation by 5-10x. If the model is not pinned, the IT team is sizing against the largest plausible option, which means cost runaway.
+</Callout>
+
+## What "done" looks like
+
+The kickoff is done when three artifacts exist.
+
+A **sized spec**: the output of running the seven inputs through the Sizer. GPU SKU, count, replica count, fabric, power, cooling. Signed off by IT and the AI team.
+
+A **decision log**: each input recorded next to who owns it, what value was chosen, and why. This is what protects you when someone asks "why are we running 14 replicas?" six months from now.
+
+A **review cadence**: when the seven inputs get re-examined. Quarterly is typical. Workloads grow, models change, precision baselines shift. The first sizing is a starting point, not a finished spec.
+
+## The takeaway
+
+The math is the easy part. The hard part is making sure the right people have agreed to the right inputs before the math runs. A kickoff that produces a sized spec, a decision log, and a review cadence is a kickoff that holds up. One that produces an order for 20 servers because "we should be safe" does not.
+
+The next module covers the optimization techniques the AI team can pull on. These are the levers that change the math after the seven inputs are pinned, and worth knowing by name so the conversation stays grounded.
+
+<TryInSizer
+  prompt="Open the Sizer, run a baseline sizing for your workload, then save the URL. The URL is the decision log: it captures every input. Share it with the AI team and the application owner as the canonical record of the kickoff agreement."
+/>

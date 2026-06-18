@@ -1,1 +1,107 @@
-*Module 6 content coming next turn.*
+M5 listed the seven parameters. This module fills them in with a real workload and walks the answer end-to-end. By the time you reach the recommendation at the bottom, you should be able to predict the shape of the output before reading it, and trace each number back to an input.
+
+The workload is realistic on purpose. A regional bank wants to roll out an internal RAG chatbot that answers employee questions against the bank's policy documents. The use case is concrete enough to ground every input. The math is the same math the Sizer runs.
+
+## The workload
+
+A retail bank with about 4,000 employees. The application is an internal RAG assistant. Employees ask questions like "what is our overdraft policy for small-business accounts?" The system retrieves the relevant policy passages and the model writes a grounded answer.
+
+Compliance requires this to run on-prem, in the bank's own data centers, with no third-party API calls. The AI team has chosen Llama 3.3-70B, the latest in the open-weight 70B class, with vLLM as the serving engine. The IT team owns the hardware sizing.
+
+## The seven inputs
+
+Walking the list from M5.
+
+**1. Model size: 70B.** Llama 3.3-70B, a dense GQA model. Standard architecture.
+
+**2. Precision: FP8.** The bank's GPUs are Hopper-class (H100 or H200), so FP8 is available and the AI team has standardized on it. Quality on policy-style retrieval has been validated.
+
+**3. Context length.** The retrieval system pulls up to fifteen policy passages per question, which works out to about 6,000 tokens of prompt on average. Responses average around 250 tokens. So the average sequence is roughly 6,250 tokens. The max context the model supports is 32K, used as a guardrail for unusually long retrievals.
+
+**4. Concurrent users.** The bank has 4,000 employees but only a fraction will use the assistant at any moment. Telemetry from the pilot suggests 80 concurrent at the peak hour (mid-morning weekdays).
+
+**5. Requests per user per minute.** Each active user submits about four questions per minute during a working session. That includes follow-ups and refinements.
+
+**6. Latency targets.** Compliance staff care more about correctness than speed, so the SLOs are generous. TTFT under 500 ms (faster than the retrieval step itself), TPOT around 40 ms (smooth reading pace).
+
+**7. Burst factor.** Monday-morning policy review meetings produce a clear spike. Historical data suggests peak load is about 2.5x the daily average.
+
+Operational defaults: N+1 redundancy (one spare replica), vLLM as the engine.
+
+## Step by step through the math
+
+**Weights.** 70 billion parameters at one byte each is 70 GB. That is the floor on GPU memory before any conversation starts.
+
+**KV per request.** Using the model architecture defaults for Llama 3.3-70B (80 layers, 8 KV heads, head dim 128), at 6,250 tokens of average context, with FP8 KV. The KV cache works out to about 1 GB per request.
+
+**In-flight requests.** RPS is 80 users times 4 requests per minute divided by 60, which is 5.3 RPS. Each request takes about 10 seconds to finish generating its 250 output tokens at TPOT of 40 ms per token. Little's Law says steady-state in-flight is the arrival rate times the service time, so 5.3 × 10 = 53. Multiply by the 2.5x burst factor to absorb the peak: 133 simultaneous requests.
+
+**Total KV.** 133 requests times 1 GB per request is 133 GB of working memory.
+
+**Activations and headroom.** Activations are about 5 percent of weights, so 3.5 GB. Headroom is 25 percent of the running total to absorb fragmentation and short bursts, which adds another 52 GB.
+
+**VRAM required.** 70 (weights) + 133 (KV) + 3.5 (activations) + 52 (headroom) = **258 GB**.
+
+<Callout variant="note">
+This is the moment to pause and check yourself. The headline number for a 70B model is "70 GB." The realistic memory requirement, with the actual conversation load, is 258 GB. That 3.7x multiplier is the gap between a back-of-envelope estimate and a sizing that holds up in production.
+</Callout>
+
+## Picking the GPU
+
+258 GB does not fit on a single GPU. Even an H200 has 141 GB. Two H200s combined give you 282 GB, which leaves a comfortable margin over 258.
+
+The bandwidth check matters too. Decode is memory-bound: each output token requires re-reading the weights and the KV cache from HBM. Required bandwidth is roughly (70 + 133) divided by the 40 ms TPOT budget, which is 5.1 TB/s. Two H200s deliver 9.6 TB/s combined, comfortably above the requirement.
+
+So one replica is **2× H200 with tensor parallelism**. The two GPUs share the model and the KV cache evenly. Internal traffic stays on NVLink inside the chassis, which is the fast interconnect the SXM form factor provides for free.
+
+The precision gate excludes A100 from consideration even though it has the memory headroom, because A100 does not support FP8. L40S is also excluded for the same reason. The engine respects the FP8 input rather than silently substituting.
+
+## Replicas and consolidation
+
+One 2-GPU replica generates about 6,500 tokens per second of useful throughput. Demand is 5.3 RPS times 6,250 average tokens times the 2.5x burst, which is 83,000 tokens per second. So 13 replicas serve the active load. Add 1 for N+1 redundancy, total **14 replicas**.
+
+That is 28 H200 GPUs. Each replica is a 2-GPU TP group, which means up to four replicas can share a single 8-GPU HGX chassis without any inter-replica traffic crossing the chassis boundary. 14 replicas pack into **4 HGX nodes** (with 4 idle GPU slots).
+
+## The recommendation
+
+Four 8U HGX H200 servers. Each server has eight H200 SXM GPUs, dual Xeon Platinum 8568Y+ CPUs, 2 TB of DDR5 RAM, eight 3.84 TB NVMe drives in RAID-10, and two 100 GbE NICs for client traffic and storage.
+
+**No InfiniBand or RoCE for compute fabric.** Each replica's TP=2 traffic stays on NVLink inside its chassis, so there is no need for a high-bandwidth GPU fabric between servers. This is the most common point where on-prem sizing gets over-engineered. Multi-node compute fabric (InfiniBand NDR at 400 Gb per port) is only needed when a single replica spans more than one chassis, which does not happen here.
+
+Power works out to four times roughly 12 kW per chassis, so 48 kW of IT load. With a PUE of 1.25 for rear-door heat exchanger cooling, the facility load is about 60 kW. That fits two racks at 24 kW each, or four racks at 12 kW each, depending on rack power feeds. Cooling sits comfortably in the rear-door HX range.
+
+## Where small input changes would move the answer
+
+Tracing the recommendation back to the inputs shows which knobs move which outputs.
+
+If average context were 12,000 tokens instead of 6,250 (a deeper retrieval policy), KV per request would double, total KV would double, VRAM would push past 400 GB, and the replica would need to go to four H200s. Replica count would drop because each replica gets bigger, but the total GPU count would go up.
+
+If concurrent users were 300 instead of 80 (a wider rollout), in-flight requests would scale roughly four times, KV total would scale similarly, and you would need three to four times more replicas. The chassis count would scale accordingly.
+
+If TPOT were tightened from 40 ms to 20 ms (a "snappier" feel that nobody asked for), required bandwidth would double. The H200 would no longer be enough at TP=2; the engine would step up to B200, which costs more per GPU and per kilowatt.
+
+If burst factor were 1.0 instead of 2.5 (sized for the average, no burst headroom), in-flight requests would drop to 53, KV total to 53 GB, VRAM to about 160 GB, and one replica would fit on a single H200 with margin. The cluster would shrink to fewer than half the replicas. This is the lever to revisit if cost pressure is high and the workload's spikes are predictable enough to handle through scheduling instead of standing capacity.
+
+## The takeaway
+
+The recommendation, "four HGX H200 chassis with 100 GbE frontend," looks deceptively simple. It is fifteen sequential calculations chained together, every one of which depends on the seven inputs from M5. Once you have done one of these by hand, the Sizer's output stops feeling like a black box.
+
+The next module is the planning checklist. It names which of these inputs is owned by IT, which by the AI team, and which by the application owner, plus the red flags to surface in the conversation before the spreadsheet exists.
+
+<TryInSizer
+  prompt="Open the Sizer with the exact inputs from this module and see the recommendation reproduce step for step. Then tweak one input at a time and watch which numbers move."
+  params={{
+    mf: "llama-3.3-70b",
+    pr: "FP8",
+    ctx: 32768,
+    pt: 6000,
+    ot: 250,
+    u: 80,
+    rpm: 4,
+    ttft: 500,
+    tpot: 40,
+    bf: 2.5,
+    r: "N+1",
+    eng: "vLLM",
+  }}
+/>

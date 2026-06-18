@@ -1,1 +1,83 @@
-*Module 5 content coming next turn.*
+The first four modules built up the vocabulary. You know what inference is, why the old playbook breaks, what happens inside a GPU when a request lands, and why the KV cache is the silent driver of capacity. This module turns that vocabulary into a short list of inputs. Seven parameters. Get them right and a sizing exercise becomes mechanical. Get them wrong, or skip one, and you spend weeks rebuilding the spreadsheet later.
+
+The seven are not arbitrary. Every parameter on the list moves the recommended infrastructure by a factor that matters. Every parameter that is not on the list either follows from these seven or is a defensible default. If a planning conversation skips any of them, the answer is not stable.
+
+<Callout variant="key">
+The seven sizing inputs are: model size, precision, context length, concurrent users, requests per user per minute, latency targets (TTFT and TPOT), and burst factor. These map one-to-one to the Sizer's inputs and to the math in the spec.
+</Callout>
+
+## 1. Model size
+
+**What it is.** The parameter count, in billions. A 7B model has seven billion learned numbers. A 70B model has seventy billion. A 405B model has four hundred and five billion.
+
+**How it moves the math.** Model size sets the floor on GPU memory. At FP8, each parameter takes one byte, so a 70B model needs 70 GB just to hold the weights, before any conversation memory or activations. The model also has to be re-read from memory on every output token, so model size is the largest contributor to required memory bandwidth.
+
+**What to ask.** "Which model exactly?" not "how big a model?" The architecture matters as much as the parameter count. A 70B dense model and a 70B-class MoE model have very different infrastructure profiles even though the headline number is the same.
+
+## 2. Precision
+
+**What it is.** The number format used to store weights, and sometimes the KV cache. The common choices today are FP16 or BF16 (two bytes per number), FP8 or INT8 (one byte), and INT4 (half a byte).
+
+**How it moves the math.** Precision cuts directly into memory and decode bandwidth. Going from BF16 to FP8 roughly halves both, with quality that is indistinguishable on chatbot and RAG workloads. INT4 quarters them but introduces noticeable quality loss on reasoning-heavy tasks.
+
+**What to ask.** "What precision are you serving at?" The 2026 production baseline is FP8 on Hopper or Blackwell GPUs. If the AI team is still serving at BF16, ask why. The most common reason is that the older A100 hardware they tested on does not support FP8, which is itself a sizing signal. The Sizer's precision gate enforces this: ask for an FP8 workload and you will not get an A100 in the recommendation, because A100 cannot run FP8 throughput at all.
+
+## 3. Context length
+
+**What it is.** Two related numbers. The maximum context the application supports (`max_context`) and the average prompt plus output length (`avg_prompt + avg_output`) that real users actually generate.
+
+**How it moves the math.** Context drives the <GlossaryTerm id="kv_cache">KV cache</GlossaryTerm>, which is the per-request working memory you met in M4. KV cache size is linear in context length. Double the context, double the KV memory per request. The Sizer uses average length for the steady-state budget and treats `max_context` as a guardrail for worst-case bursts.
+
+**What to ask.** "What context length does the application actually support, and what does the realistic average look like?" The two are almost always different. An application that supports 128K tokens usually averages 4K to 8K in practice. Sizing against the max is the most common way to over-provision by a factor of three or more.
+
+## 4. Concurrent users
+
+**What it is.** The number of distinct human users (or upstream callers) talking to the system at the same time during peak hours.
+
+**How it moves the math.** Concurrency multiplies KV cache. A given context length costs roughly the same per request, but ten simultaneous requests cost ten times that. Concurrency, multiplied by context length, is the term that determines how many GPUs you actually need.
+
+**What to ask.** "Peak concurrent users during the busiest hour, not registered users." A SaaS application with 50,000 registered users might have 200 concurrent at peak. Plan against 200, not 50,000. If the application is internal-only, ask whether the time zone of the user base concentrates load into a narrower window.
+
+## 5. Requests per user per minute
+
+**What it is.** How often each active user sends a request. A chat assistant might see two requests per minute per active user. An agentic workflow that spawns sub-calls might see ten or more. A batch summarization job effectively has one user submitting requests as fast as the system accepts them.
+
+**How it moves the math.** Concurrent users times requests per user per minute, divided by sixty, gives you the request rate in requests per second (RPS). RPS combined with average request duration is what tells you the steady-state number of in-flight requests, which is what the cluster has to absorb.
+
+**What to ask.** "What does a session look like? How chatty?" Watch out for systems that look like chat but are really agents. An agentic workflow that fires three or four LLM calls per user action multiplies your RPS by the same factor. The AI team often knows the per-action call count but does not surface it until asked.
+
+## 6. Latency targets: TTFT and TPOT
+
+**What they are.** Two separate latency budgets. <GlossaryTerm id="ttft">TTFT</GlossaryTerm> is the wait between hitting send and seeing the first character. <GlossaryTerm id="tpot">TPOT</GlossaryTerm> is the steady-state pace at which subsequent tokens stream out.
+
+**How they move the math.** TTFT is set by prefill cost plus queueing, and it pushes back on batch size. Lower TTFT means smaller batches, which means lower aggregate throughput per GPU. TPOT is set by memory bandwidth, since decode rereads weights and KV on every output token. A tighter TPOT target forces the engine to a higher-bandwidth GPU, often jumping from H100 to H200 or H200 to B200 just for the bandwidth, even when memory capacity is fine.
+
+**What to ask.** "What latency does the application actually need?" Interactive chat usually wants TTFT under 500 ms and TPOT around 30 to 50 ms (smooth reading speed). RAG can tolerate higher TTFT because users expect retrieval to take a beat. Batch jobs have no TTFT constraint at all. Aggressive defaults like "200 ms TTFT, 20 ms TPOT" without a use case to justify them are a common cause of over-provisioning.
+
+## 7. Burst factor
+
+**What it is.** The ratio of peak load to average load. A burst factor of 2.5 means the peak hour sees two-and-a-half times the steady-state request rate.
+
+**How it moves the math.** <GlossaryTerm id="burst_factor">Burst factor</GlossaryTerm> multiplies the replica count directly. You can either size to the peak (high cost, no degradation), or size to the average and rely on autoscaling (lower cost, risk of throttling during the spike). On-prem deployments with fixed hardware effectively size to the peak, which is why the burst factor input matters so much more here than in cloud planning.
+
+**What to ask.** "What does the daily and weekly load pattern look like?" Internal enterprise applications often see a 3-to-1 spike during business hours. Customer-facing applications often see flatter load. The right burst factor falls out of historical telemetry, not from a guess. If no telemetry exists yet, 2.0 to 2.5 is a defensible starting point and the Sizer's default.
+
+## Two more inputs that look optional
+
+The seven above are the load-bearing inputs. Two more are worth flagging because they will come up in the conversation.
+
+**Redundancy mode** (N, N+1, or N+2). This is the number of spare replicas the cluster carries above what is needed to serve the workload. The default of N+1 means one replica can fail without service degradation. Mission-critical or regulated workloads use N+2. The choice is operational, not technical, and it lives with the application owner.
+
+**Serving engine** (vLLM, TensorRT-LLM, SGLang, Triton). The choice changes per-replica throughput by 15 to 25 percent at the margin, but every modern engine implements continuous batching and PagedAttention, so the math is similar across them. The AI team picks this; the IT team confirms that whichever they picked supports the optimizations covered in M8.
+
+Everything else in the Sizer (optimization toggles, KV dtype, prefix caching) lives in the Advanced step and has safe defaults. The defaults are tuned to match the 2026 production baseline. You only need to touch them when the AI team has made an explicit choice that deviates from that baseline.
+
+## The takeaway
+
+Seven inputs, in order: model, precision, context, concurrent users, requests per minute, latency targets, burst factor. If a planning meeting ends with all seven on a piece of paper, signed off by both sides, the rest of the sizing exercise is mechanical. If any one of them is missing, the answer will move by a factor of two or more when it shows up later.
+
+The next module takes one realistic workload, fills in all seven parameters, and walks the math end-to-end. By the end you will see exactly how a recommendation falls out of these inputs, and why a small change in one of them moves the answer.
+
+<TryInSizer
+  prompt="Open the Sizer with the default 70B Llama RAG workload and look at the Inputs step. You will see all seven parameters from this module, labeled with the same names, with the defaults that match the 2026 production baseline."
+/>
