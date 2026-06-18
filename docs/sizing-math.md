@@ -147,13 +147,13 @@ References: [Introl liquid-cooling thresholds](https://introl.com/blog/liquid-co
 |---|---|---|---|---|
 | Llama 3.1-8B | 32 | 8 | 128 | GQA |
 | Llama 3.1-70B / 3.3-70B | 80 | 8 | 128 | GQA |
-| Llama 3.1-405B | 126 | 16 | 128 | GQA, multi-node |
+| Llama 3.1-405B | 126 | 8 | 128 | GQA, multi-node |
 | Mixtral 8x7B | 32 | 8 | 128 | MoE, 2 active experts |
 | Mixtral 8x22B | 56 | 8 | 128 | MoE, 2 active |
 | Qwen3-32B | 64 | 8 | 128 | GQA |
 | Qwen3-235B-A22B | 94 | 4 | 128 | MoE, ~22B active |
 | DeepSeek-V3 (671B) | 61 | n/a (MLA) | 128 | MLA → KV ~1/10 of GQA-equivalent |
-| GPT-OSS 120B | 80 | 8 | 128 | MoE, dense-equivalent KV |
+| GPT-OSS 120B | 36 | 8 | 128 | MoE, dense-equivalent KV |
 
 Sources: published configs / [Pierre Lienhart KV deep-dive](https://medium.com/@plienhar/llm-inference-series-4-kv-caching-a-deeper-look-4ba9a77746c8), [Lyceum KV calculator](https://lyceum.technology/magazine/kv-cache-memory-calculation-llm/).
 
@@ -255,23 +255,24 @@ Math:
 - W = 70 GB. KV_req(6250 tok, FP8) = 2×80×8×128×6250×1 ≈ 1.0 GB.
 - RPS = 80×4/60 = 5.3. E[out_sec] = 250×0.04 = 10 s. B_peak = ceil(5.3×10×2.5) = 133.
 - KV_total = 133 GB. A = 3.5 GB. H = 0.25×(70+133+3.5) = 52 GB. **VRAM = 258 GB**.
-- 2× H200 = 282 GB — fits with margin. Bandwidth: (70+133)/0.040 = 5.1 TB/s required vs 2×4.8 = 9.6 TB/s — OK.
-- Throughput on 2× H200 ≈ 6500 tok/s. Demand = 5.3×6250×2.5 = 83k tok/s → 13 active. With N+1: **14 replicas** of 2× H200 = 28 H200 GPUs across 4 nodes (8 GPUs/node).
+- 2× H200 = 282 GB — fits with margin. The FP8 precision gate (Step 8) excludes A100 and L40S from the candidate set even though L40S has the headroom for a single weight shard, because neither SKU supports FP8 throughput. Bandwidth: (70+133)/0.040 = 5.1 TB/s required vs 2×4.8 = 9.6 TB/s — OK.
+- Throughput on 2× H200 ≈ 6500 tok/s. Demand = 5.3×6250×2.5 = 83k tok/s → 13 active. With N+1: **14 replicas** of 2× H200 = 28 H200 GPUs total. Each replica is a single-chassis TP=2 group, so up to 4 replicas can co-tenant one 8-GPU HGX chassis. 14 replicas pack into 4 HGX nodes (32 GPU slots, 4 idle).
 
-Output: 4× 8U HGX H200 servers, dual Xeon Platinum 8568Y+, 2 TB DDR5, 8× 3.84 TB NVMe Gen5 RAID-10, 8× ConnectX-7 400G + 2× 100 GbE frontend. Fabric: 400 Gb InfiniBand NDR (used for failover/sharding, not steady TP). Power: 4× 12 kW = 48 kW IT, ~60 kW facility. Cooling: **RDHX** (12 kW/rack × 4, or 24 kW × 2 racks).
+Output: 4× 8U HGX H200 servers, dual Xeon Platinum 8568Y+, 2 TB DDR5, 8× 3.84 TB NVMe Gen5 RAID-10, 2× 100 GbE frontend. Fabric: **100 GbE frontend only**. Each replica's TP=2 traffic stays on NVLink inside the chassis, so no InfiniBand or RoCE is required. Power: 4× 12 kW = 48 kW IT, ~60 kW facility. Cooling: **RDHX** (12 kW/rack × 4, or 24 kW × 2 racks).
 
-### TC3 — Llama 3.1-405B, multi-node
+### TC3 — Llama 3.1-405B, single-node TP=8
 Inputs: `param=405`, `precision=FP8`, `max_context=8192`, `avg_prompt=2000`, `avg_output=400`, `users=200`, `req/user/min=1`, `TTFT=1500`, `TPOT=50`, `burst=2.0`, `N+1`, `TRT-LLM`.
 
 Math:
-- W = 405 GB. KV_req(2400 tok, FP8) = 2×126×16×128×2400×1 ≈ 1.24 GB.
+- W = 405 GB. KV_req(2400 tok, FP8, **kv_heads=8** per the §3 table) = 2×126×8×128×2400×1 ≈ 0.62 GB.
 - RPS = 200/60 = 3.3. E[out_sec] = 400×0.05 = 20 s. B_peak = ceil(3.3×20×2.0) = 132.
-- KV_total = 132 × 1.24 = 164 GB. A = 20 GB. H = 0.25×(405+164+20) = 147 GB. **VRAM = 736 GB**.
-- 8× H200 = 1128 GB — fits, TP=8. Bandwidth: (405+164)/0.050 = 11.4 TB/s required vs 8×4.8 = 38.4 TB/s — fine.
-- Throughput per replica ≈ 2000 tok/s (TRT-LLM ~+20%). Demand = 3.3×2400×2 = 16k tok/s → 8 replicas. With N+1: **9 replicas** = 72× H200 across 9 HGX nodes.
-- Alternative: 8× B200 per replica, ~5000 tok/s — collapse to 4 replicas (N+1 = 5 nodes). Recommend B200 path if facility supports liquid.
+- KV_total = 132 × 0.62 = 82 GB. A = 20 GB. H = 0.25×(405+82+20) = 127 GB. **VRAM = 634 GB**.
+- 8× H200 = 1128 GB — fits comfortably at TP=8. Bandwidth: (405+82)/0.050 = 9.7 TB/s required vs 8×4.8 = 38.4 TB/s — fine.
+- Because TP=8 lives entirely inside one HGX chassis on NVLink, this is a **single-node replica**. The earlier framing as "multi-node" reflected a doubled KV cache that used kv_heads=16; with the correct constant the model fits one node end-to-end.
+- Throughput per replica ≈ 2000 tok/s (TRT-LLM ~+20%). Demand = 3.3×2400×2 = 16k tok/s → 8 replicas. With N+1: **9 replicas** = 9× HGX H200 nodes, 72 H200 GPUs total. No replica spans nodes.
+- Alternative: 8× B200 per replica, ~5000 tok/s — collapse to 4 replicas (N+1 = **5 nodes**). Recommend B200 path if facility supports liquid.
 
-Output (B200 path): 5× DGX B200, dual Xeon Platinum, 2 TB DDR5, 30 TB NVMe, 8× CX-7 400G + 2× 100 GbE. Fabric: **400 Gb InfiniBand NDR rails** non-blocking. Power: 5 × 14.3 kW = 72 kW IT, ~83 kW facility. Cooling: **direct liquid mandatory** (B200 air variant exists but DGX B200 ships liquid-assisted).
+Output (B200 path): 5× DGX B200, dual Xeon Platinum, 2 TB DDR5, 30 TB NVMe, 2× 100 GbE frontend. Fabric: **100 GbE frontend only** — TP=8 traffic stays on NVSwitch inside each DGX, no inter-node InfiniBand required for this workload. Power: 5 × 14.3 kW = 72 kW IT, ~83 kW facility. Cooling: **direct liquid mandatory** (B200 air variant exists but DGX B200 ships liquid-assisted).
 
 ### TC4 — Nightly batch 70B summarization
 Inputs: `workload=batch`, `param=70`, `precision=FP8`, `max_context=8192`, `avg_prompt=8000`, `avg_output=400`, no SLO; 50k docs in 6 hours; `burst=1.0`, `N+0`, `vLLM`.
