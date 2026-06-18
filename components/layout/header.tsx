@@ -1,10 +1,12 @@
 import Link from "next/link";
 
+// Display labels are visitor-friendly; URLs stay stable so internal links
+// across the curriculum and content don't have to change.
 const navItems = [
-  { href: "/knowledge", label: "Knowledge" },
-  { href: "/components", label: "Components" },
-  { href: "/sizer", label: "Sizer" },
-  { href: "/designer", label: "Designer" },
+  { href: "/knowledge", label: "Learn" },
+  { href: "/components", label: "Explore" },
+  { href: "/sizer", label: "Plan" },
+  { href: "/designer", label: "Design" },
 ];
 
 export function Header() {
