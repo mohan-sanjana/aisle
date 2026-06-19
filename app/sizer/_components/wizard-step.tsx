@@ -28,12 +28,12 @@ export function WizardStep({
   hideNext?: boolean;
 }) {
   return (
-    <section className="flex flex-col gap-6">
+    <section className="flex flex-col gap-5">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-h2 text-slate-900">{title}</h2>
+          <h2 className="text-h3 text-slate-900">{title}</h2>
           {description && (
-            <p className="mt-1 text-small text-slate-600">{description}</p>
+            <p className="mt-1 text-xs text-slate-600">{description}</p>
           )}
         </div>
         {onReset && (

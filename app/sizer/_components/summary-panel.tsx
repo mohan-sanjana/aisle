@@ -31,21 +31,21 @@ export function SummaryPanel({
   return (
     <section
       aria-labelledby="summary-heading"
-      className="rounded-lg border border-brand-100 bg-brand-50/40 p-5"
+      className="rounded-lg border border-brand-100 bg-brand-50/40 p-4"
     >
-      <h3 id="summary-heading" className="text-h3 text-slate-900">
+      <h3 id="summary-heading" className="text-base font-semibold text-slate-900">
         Summary
       </h3>
-      <p className="mt-2 text-base leading-relaxed text-slate-800">
+      <p className="mt-1.5 text-sm leading-relaxed text-slate-800">
         {headline}
       </p>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
         <div>
-          <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
+          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-slate-700">
             What&rsquo;s driving the sizing
           </h4>
-          <ul className="mt-2 space-y-1.5 text-sm text-slate-700">
+          <ul className="mt-1.5 space-y-1 text-xs leading-relaxed text-slate-700">
             {drivers.map((d, i) => (
               <li key={i} className="flex gap-2">
                 <span aria-hidden="true" className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-brand-700" />
@@ -56,10 +56,10 @@ export function SummaryPanel({
         </div>
 
         <div>
-          <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
+          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-slate-700">
             What would change the answer
           </h4>
-          <ul className="mt-2 space-y-1.5 text-sm text-slate-700">
+          <ul className="mt-1.5 space-y-1 text-xs leading-relaxed text-slate-700">
             {sensitivities.map((s, i) => (
               <li key={i} className="flex gap-2">
                 <span aria-hidden="true" className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-400" />
@@ -71,7 +71,7 @@ export function SummaryPanel({
       </div>
 
       {output.confidence.is_moe && (
-        <p className="mt-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-900">
           <strong>MoE caveat:</strong> Mixture-of-Experts sizing carries wider
           error bars (±30%) than dense models, because expert routing and
           per-engine load balance are workload-dependent. Treat the numbers

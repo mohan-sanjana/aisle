@@ -40,11 +40,11 @@ function Spec({
   mono?: boolean;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-2 border-b border-slate-100 py-1.5 last:border-b-0">
-      <dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt>
+    <div className="flex items-baseline justify-between gap-2 border-b border-slate-100 py-1 last:border-b-0">
+      <dt className="text-[10px] uppercase tracking-wide text-slate-500">{label}</dt>
       <dd
         className={cn(
-          "text-right text-small text-slate-900",
+          "text-right text-xs text-slate-900",
           mono && "font-mono",
         )}
       >
@@ -66,34 +66,34 @@ export function ScenarioCard({ scenario }: { scenario: ScenarioOutput }) {
       )}
       aria-labelledby={`scenario-${scenario.name}`}
     >
-      <header className="px-4 py-3">
+      <header className="px-4 py-2.5">
         <h3
           id={`scenario-${scenario.name}`}
-          className="text-h3 leading-tight text-slate-900"
+          className="text-base font-semibold leading-tight text-slate-900"
         >
           {meta.title}
         </h3>
-        <p className="mt-0.5 text-xs text-slate-500">{meta.subtitle}</p>
+        <p className="mt-0.5 text-[11px] text-slate-500">{meta.subtitle}</p>
       </header>
 
-      <div className="grid grid-cols-2 gap-2 px-4 pb-3">
-        <div className="rounded-md bg-brand-50 px-3 py-2">
-          <p className="text-xs uppercase tracking-wide text-brand-800">
+      <div className="grid grid-cols-2 gap-2 px-4 pb-2.5">
+        <div className="rounded-md bg-brand-50 px-3 py-1.5">
+          <p className="text-[10px] uppercase tracking-wide text-brand-800">
             Servers
           </p>
-          <p className="font-mono text-2xl font-semibold leading-tight text-brand-800">
+          <p className="font-mono text-xl font-semibold leading-tight text-brand-800">
             {scenario.servers_required}
           </p>
         </div>
-        <div className="rounded-md bg-slate-50 px-3 py-2">
-          <p className="text-xs uppercase tracking-wide text-slate-700">
+        <div className="rounded-md bg-slate-50 px-3 py-1.5">
+          <p className="text-[10px] uppercase tracking-wide text-slate-700">
             Replicas
           </p>
-          <p className="font-mono text-2xl font-semibold leading-tight text-slate-900">
+          <p className="font-mono text-xl font-semibold leading-tight text-slate-900">
             {scenario.replica_count}
           </p>
           {scenario.replicas_per_server > 1 && (
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-[10px] text-slate-500">
               {scenario.replicas_per_server} per server
             </p>
           )}
@@ -101,7 +101,7 @@ export function ScenarioCard({ scenario }: { scenario: ScenarioOutput }) {
       </div>
 
       <section className="px-4 pb-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+        <h4 className="text-[10px] font-semibold uppercase tracking-wide text-slate-700">
           Server hardware
         </h4>
         <dl className="mt-1">
@@ -121,20 +121,20 @@ export function ScenarioCard({ scenario }: { scenario: ScenarioOutput }) {
       </section>
 
       <section className="px-4 py-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+        <h4 className="text-[10px] font-semibold uppercase tracking-wide text-slate-700">
           Fabric
         </h4>
-        <p className="mt-1 text-small text-slate-900">
+        <p className="mt-1 text-xs text-slate-900">
           {fabric.type}{" "}
           <span className="font-mono text-slate-500">
             ({fmt(fabric.bandwidth_gbps)} Gb)
           </span>
         </p>
-        <p className="mt-0.5 text-xs text-slate-500">{fabric.rationale}</p>
+        <p className="mt-0.5 text-[11px] text-slate-500">{fabric.rationale}</p>
       </section>
 
       <section className="px-4 py-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+        <h4 className="text-[10px] font-semibold uppercase tracking-wide text-slate-700">
           Power
         </h4>
         <dl className="mt-1">
@@ -158,20 +158,20 @@ export function ScenarioCard({ scenario }: { scenario: ScenarioOutput }) {
       </section>
 
       <section className="px-4 py-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+        <h4 className="text-[10px] font-semibold uppercase tracking-wide text-slate-700">
           Cooling
         </h4>
-        <p className="mt-1 text-small text-slate-900">{cooling.tier}</p>
-        <p className="mt-0.5 text-xs text-slate-500">{cooling.rationale}</p>
+        <p className="mt-1 text-xs text-slate-900">{cooling.tier}</p>
+        <p className="mt-0.5 text-[11px] text-slate-500">{cooling.rationale}</p>
       </section>
 
       {scenario.warnings.length > 0 && (
         <section className="border-t border-slate-100 px-4 py-2">
-          <h4 className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-amber-800">
+          <h4 className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
             <AlertTriangle className="h-3 w-3" aria-hidden="true" />
             Warnings
           </h4>
-          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-amber-900">
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[11px] text-amber-900">
             {scenario.warnings.map((w, i) => (
               <li key={i}>{w}</li>
             ))}

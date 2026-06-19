@@ -37,7 +37,7 @@ export function LiveResults({ input }: { input: SizerInput }) {
     <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-h2 text-slate-900">Live result</h2>
+          <h2 className="text-h3 text-slate-900">Live result</h2>
           <ConfidenceBadge confidence={output.confidence} />
         </div>
         <ExportButtons input={input} output={output} />
