@@ -1,61 +1,62 @@
-The traditional IT planning rhythm has worked for a decade. CPUs scale with workload. RAM scales with state. IOPS scales with storage demand. Network throughput scales with users. The ratios are stable. If you add another rack of servers, you know roughly how many users it can absorb.
+The traditional IT planning rhythm has worked for a decade because hardware scaling was predictable. If you needed to support more users, you added a standardized cluster node. Compute, memory, and I/O scaled in balanced, familiar ratios. If you added another rack of standard enterprise servers, you knew exactly how much application traffic it could safely absorb.
 
-Inference breaks four of these assumptions. Each one breaks quietly. The numbers look familiar at first glance, but if you plan against them the way you'd plan against a database or a web tier, you will either over-provision by four times, or under-provision and discover the gap in production.
+Inference breaks four of these foundational planning assumptions. Each one breaks quietly. The numbers look familiar on a spreadsheet, but if you plan against them the way you would plan a traditional web tier or database, you will either over-provision by four times or suffer catastrophic failures in production.
 
-This module names each broken assumption and what replaces it. The next four modules explain the mechanics. The most important point arrives at the end: the planning practice itself has to change, not just the parameters in your spreadsheet.
+This module names each broken assumption, what replaces it, and highlights exactly where the infrastructure team and the AI workload owners must collaborate to survive.
 
-## Assumption 1: you can plan from the metrics you already track
+<figure className="my-8">
+  <img
+    src="/knowledge/four-broken-assumptions.png"
+    alt="Side-by-side comparison of the four traditional infrastructure planning assumptions (hardware specs, users and requests, memory overcommit, 10 kW rack planning) against the AI inference reality that replaces each one (HBM bandwidth, tokens and context, hard HBM ceiling, power and cooling limits)."
+    className="mx-auto w-full max-w-3xl rounded-lg border border-slate-200"
+  />
+  <figcaption className="mt-2 text-center text-sm text-slate-500">
+    The four assumptions, side by side with what replaces them in an AI inference workload.
+  </figcaption>
+</figure>
 
-The traditional planning playbook uses metrics that any infrastructure spec sheet leads with. CPU cores. Clock speed. RAM. IOPS. Network bandwidth. For inference, those numbers won't get you a good answer.
+## Assumption 1: You can plan using standard hardware spec sheets
 
-The single most important spec for streaming inference performance is HBM memory bandwidth, and most enterprise GPU spec sheets don't even feature it in the headline. Two GPUs with the same FLOPS rating can serve very different numbers of users. An H100 and an H200 have similar compute envelopes. The H200 has about 43 percent more memory bandwidth, and serves roughly that much more decode throughput on the same model.
+Traditional planning relies on headline specs: CPU cores, clock speed, RAM capacity, and network bandwidth. For AI inference, these numbers hide the real constraint. 
 
-Beyond bandwidth, the planning conversation needs three more metrics that aren't on any traditional spec sheet. KV cache footprint per token (in kilobytes per token, often around 160 KB for a 70B model at FP8). Tokens per second per replica, which is the throughput unit that converts to "how many users can this server handle." And the precision the model will run at, which changes both memory and throughput by two times or more. None of these were in your previous planning toolkit. All of them are required now.
+The critical metric for LLM generation is **HBM (High Bandwidth Memory) bandwidth**. Serving an LLM is a data-delivery bottleneck; the hardware spends far more time waiting to read model parameters from memory than it does processing math. For example, the NVIDIA H100 and H200 have nearly identical raw compute power, but the H200's 43% higher memory bandwidth unlocks 60% to 90% more token throughput.
 
-## Assumption 2: the workload spec contains the parameters that drive capacity
+Planning requires a new vocabulary:
+- **KV Cache Footprint:** The high-speed memory eaten up just by holding a user's ongoing conversation history in VRAM (roughly 160 KB per token for a 70B model at FP8).
+- **Precision (Quantization):** How heavily the model's math is compressed (e.g., FP16 down to FP8 or INT4), which instantly cuts your memory requirement in half or more.
 
-A database load test asks two questions. How many users. What query rate per user. The answer falls out of those.
+## Assumption 2: Sizing is driven entirely by user headcount and traffic rates
 
-For inference, the answer requires five inputs, and two of them aren't on most application specs.
+Traditional sizing asks two questions: *How many users?* and *What is their request rate?* 
 
-The familiar ones: how many users, how many requests per user per minute, what latency SLOs.
+For inference, scaling by headcount is a trap. The defining metric is: **"How many tokens are actively in flight at peak, and how long are the context histories?"**
 
-The new ones: how long is each conversation's history (context length), and how many of those conversations are simultaneously mid-response (in-flight concurrency). These two parameters multiply, and the product is what drives the GPU memory budget. A 200-user app at 8,000-token contexts is one workload. The same 200 users at 128,000-token contexts is a workload an order of magnitude heavier. Same headcount, very different infrastructure.
+Imagine 500 users asking an AI short questions using a tight, 4,000-token context window. That is a light, easy-to-manage hardware footprint. Now, take those exact same 500 users and have them point the AI at massive documents using a 128,000-token context window. Your user count stayed exactly the same, but your infrastructure requirements just skyrocketed by an order of magnitude.
 
-This catches IT teams used to scaling on user counts. The planning question is no longer "how many users." It is "how many in-flight requests at peak, and how long are they."
+## Assumption 3: Memory has a graceful degradation path (The Death of Overcommit)
 
-## Assumption 3: working memory has graceful degradation paths
+In traditional virtualization, memory is fluid. If a database spikes, it safely spills over to system RAM or swaps to NVMe SSDs. Performance degrades, but the service stays alive. Because of this, IT teams routinely "overcommit" memory, assuming not everyone will max out at once.
 
-Traditional infrastructure has a memory hierarchy. Cache, RAM, SSD, disk. Workloads spill from faster tiers to slower ones when they have to, with gradually worse performance. An overloaded database starts hitting disk. A starved web app starts queueing. Performance degrades, but service continues.
+**AI inference has no graceful degradation, and overcommit is dead.** The active working memory of an ongoing conversation (the KV cache) must live directly in HBM alongside the model weights. While inference engines can technically swap blocks back to system RAM under extreme pressure, doing so introduces massive PCIe bottlenecks that destroy your latency targets. If HBM fills up in production, requests don't just slow down—they fail outright. You must provision for hard, non-negotiable peak memory ceilings.
 
-Inference has no spill. The working memory of every in-flight conversation must fit in HBM, the most expensive memory tier in the system, in the same physical space as the model weights themselves. There is no swap to RAM, no offload to NVMe (without significant engineering work and a real latency hit), no graceful degradation. If HBM fills up, requests queue or fail outright.
+## Assumption 4: Existing facilities can comfortably house the hardware
 
-This means a 70 GB model serving 200 conversations might actually need 200 GB of HBM, not because the model grew, but because the conversations brought their own memory and stored it in the same place the model lives. The "storage budget" and the "compute budget" are the same line item.
+For a decade, data centers have handled a predictable envelope of 8 to 15 kilowatts (kW) per rack, which accommodates dense rows of CPU servers comfortably.
 
-## Assumption 4: existing facility envelopes accommodate your workload
+A single modern 8-GPU baseboard chassis (like an NVIDIA HGX H100 or H200) draws 10 to 11 kW all by itself. One server maxes out the allocation for an entire legacy rack. Attempting to stack four of these pushes 40 kW. Moving into cutting-edge architectures like a liquid-cooled Blackwell NVL72 rack means dealing with a massive **120 kW to 140 kW per rack** footprint. 
 
-Most colocation facilities are designed around 8 to 15 kilowatts per rack. That has been the planning baseline for a decade, and it accommodates dense CPU racks comfortably.
+Furthermore, GPUs run at near-maximum thermal design power (TDP) continuously while serving heavy inference loads, rather than the bursty patterns of CPUs. This is a structural facilities conversation that must happen months before hardware lands on the loading dock.
 
-A single 8-GPU server, like an HGX H100 chassis, pulls 10 to 11 kilowatts by itself. One server fills the rack envelope. Stack four of them in one rack and you are at 40 kW, well past most legacy power feeds. The latest Blackwell racks pull 120 to 140 kW and require liquid cooling as a design constraint, not a tuning choice.
+## The Blindspot: Why you can't plan infra in a silo
 
-GPU servers also draw power continuously at near-rated TDP, not in the bursty pattern CPU workloads have trained facilities to expect. Total facility consumption is higher than peak numbers might suggest, and cooling has to be sized for the sustained load.
+The underlying reality of these four broken assumptions is that infrastructure is no longer decoupled from code. In the AI era, **a single engineering choice made by the data science team will completely rewrite your physical infrastructure requirements.** 
 
-The fix is not a software optimization. It is a facilities conversation, often a contract amendment, sometimes a build-out. That conversation needs to happen before any hardware lands on the loading dock.
+For example, if the AI team decides to run a massive model that cannot fit on a single GPU, they must split it using different parallelism approaches. If they choose **Tensor Parallelism** (splitting model layers *across* multiple GPUs), the system requires nearly instantaneous mathematical synchronization. Sizing a cluster with standard PCIe slots and regular network switches here will entirely cripple the application; Tensor Parallelism mandates ultra-fast intra-node fabric like NVLink or highly specialized backend networks like InfiniBand or RoCE. Conversely, if they opt for **Pipeline Parallelism** (splitting the model sequentially), the networking strain shifts entirely, changing your bottleneck to sequential memory caching and batch-scheduling configurations.
 
-## What this actually changes about planning
+If you plan your networking, storage, and node layouts based purely on a passive hardware requisition form without understanding the data science team's software architectural roadmap, you are highly likely to build the wrong architecture. 
 
-The four shifts above are the visible surface of a deeper change. Capacity planning for inference is no longer something the IT team can do alone, and it is no longer a one-time exercise.
+The next four modules give you the explicit vocabulary to turn this friction into a competitive advantage. M3 explains what is actually happening inside a GPU during inference, M4 deconstructs the mechanics of the KV cache, M5 details the seven variables you must track, and M6 walks through a complete, real-world sizing calculation.
 
-**It is no longer solo work.** Every important number depends on a choice the AI team makes. Which model. At what precision. With what context length cap. On which serving engine. With which optimizations enabled. Two AI teams running "the same" 70B model can end up needing four times different infrastructure depending on how those choices land. You cannot estimate a workload by reading its spec. You have to ask the AI team to walk you through their stack, and you have to do that regularly enough that you catch changes before they ship.
-
-**It is no longer a one-time exercise.** The AI ecosystem moves in months, not years. A new model release, a context window upgrade, a serving engine version bump, a quantization recipe that wasn't possible a quarter ago: any one of these changes the math. A plan that was right when you ordered hardware can be wrong by the time it arrives. The right cadence for revisiting an inference capacity plan is quarterly, not annually.
-
-Three habits follow from this, and the IT team will need all three.
-
-First, a standing planning conversation with the AI team. Not a one-time intake form. A recurring meeting where the AI team's roadmap (which models they're piloting, which optimizations they're testing) becomes a planning input.
-
-Second, a willingness to revisit assumptions when conditions change. The deployment you sized last quarter for a 32K context window may need to be re-sized when the AI team decides 128K is now the standard. A capacity plan should have a version number and a refresh date.
-
-Third, a vocabulary upgrade. The next four modules give you that vocabulary. M3 explains what is actually happening inside a GPU during inference. M4 covers the KV cache, the piece of working memory that drives most of the surprises. M5 names the seven parameters you need to plan against. M6 walks them through a worked example.
-
-Once you have the vocabulary, the planning conversation with the AI team stops feeling like translation and starts feeling like collaboration. That is the right end state, and it's the only one that holds up over time.
+<TryInSizer
+  prompt="Open the Sizer with the default 70B Llama RAG workload to see how changing context length completely resizes the physical hardware footprint."
+/>
