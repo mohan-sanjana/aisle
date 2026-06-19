@@ -3,11 +3,13 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import type { SizerInput } from "@/lib/sizer/types";
+import { sizeWorkload } from "@/lib/sizer";
+import type { SizerInput, SizerOutput } from "@/lib/sizer/types";
 
 import { DEFAULT_SIZER_INPUT } from "../_lib/defaults";
 import { decodeSizerInput, encodeSizerInput } from "../_lib/url-state";
 import { LiveResults } from "./live-results";
+import { ScenarioGrid } from "./scenario-grid";
 import { Stepper, type StepId } from "./stepper";
 import { WizardStep } from "./wizard-step";
 import { AdvancedStep } from "./steps/advanced-step";
@@ -132,6 +134,18 @@ export function SizerWizard() {
 
   const completed = React.useMemo(() => computeCompleted(input), [input]);
 
+  // Compute sizing once at this level so both <LiveResults /> (right column,
+  // sticky) and <ScenarioGrid /> (full-width row below) share one result.
+  const output: SizerOutput | { error: string } = React.useMemo(() => {
+    try {
+      return sizeWorkload(input);
+    } catch (e) {
+      return {
+        error: e instanceof Error ? e.message : "Unable to size workload.",
+      };
+    }
+  }, [input]);
+
   const stepIndex = STEP_ORDER.indexOf(currentStep);
   const onBack =
     stepIndex > 0
@@ -143,6 +157,7 @@ export function SizerWizard() {
       : undefined;
 
   return (
+    <>
     <div className="grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)_minmax(0,1.4fr)]">
       <aside
         className="no-print lg:sticky lg:top-20 lg:self-start"
@@ -242,8 +257,14 @@ export function SizerWizard() {
         className="lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto"
         aria-label="Live result"
       >
-        <LiveResults input={input} />
+        <LiveResults input={input} output={output} />
       </aside>
     </div>
+
+    {/* Full-width scenario comparison row below the wizard + form + summary
+        3-column grid, so each scenario card gets roughly a third of the
+        page width instead of being squeezed into the right column. */}
+    <ScenarioGrid output={output} />
+    </>
   );
 }

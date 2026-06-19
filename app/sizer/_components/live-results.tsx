@@ -1,29 +1,32 @@
 "use client";
 
-import * as React from "react";
-
-import { sizeWorkload } from "@/lib/sizer";
 import type { SizerInput, SizerOutput } from "@/lib/sizer/types";
 
 import { AssumptionsPanel } from "./assumptions-panel";
 import { ConfidenceBadge } from "./confidence-badge";
 import { DeploymentSchematic } from "./deployment-schematic";
 import { ExportButtons } from "./export-button";
-import { ScenarioCard } from "./scenario-card";
 import { SummaryPanel } from "./summary-panel";
 import { WarningBanner } from "./warning-banner";
 
-export function LiveResults({ input }: { input: SizerInput }) {
-  const output: SizerOutput | { error: string } = React.useMemo(() => {
-    try {
-      return sizeWorkload(input);
-    } catch (e) {
-      return {
-        error: e instanceof Error ? e.message : "Unable to size workload.",
-      };
-    }
-  }, [input]);
-
+/**
+ * The sticky right column on the Sizer page.
+ *
+ * Shows the header, warnings, plain-English summary, deployment schematic,
+ * and assumptions. The three Baseline / Burst / Resilient scenario cards
+ * live in <ScenarioGrid /> below the main 3-column grid so they get full
+ * page width and stay readable.
+ *
+ * Caller passes both `input` and `output` so the calculation can be lifted
+ * to wizard.tsx and shared with <ScenarioGrid /> without re-running.
+ */
+export function LiveResults({
+  input,
+  output,
+}: {
+  input: SizerInput;
+  output: SizerOutput | { error: string };
+}) {
   if ("error" in output) {
     return (
       <div className="rounded-md border border-red-300 bg-red-50 p-4 text-small text-red-800">
@@ -48,12 +51,6 @@ export function LiveResults({ input }: { input: SizerInput }) {
       <SummaryPanel input={input} output={output} />
 
       <DeploymentSchematic output={output} />
-
-      <div className="scenario-grid grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <ScenarioCard scenario={output.scenarios.baseline} />
-        <ScenarioCard scenario={output.scenarios.burst} />
-        <ScenarioCard scenario={output.scenarios.resilient} />
-      </div>
 
       <AssumptionsPanel assumptions={output.assumptions} />
     </div>
