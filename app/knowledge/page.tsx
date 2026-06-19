@@ -28,7 +28,7 @@ export default function KnowledgeIndexPage() {
           A working knowledge of on-prem AI inference
         </h1>
         <p className="mt-4 max-w-prose text-base leading-relaxed text-slate-700">
-          Learn about AI inference and what makes it a truly unique workload. They build on each other — start at
+          Learn about AI inference and what makes it a truly unique workload. The modules below build on each other. You can start at
           the top if you&rsquo;re new to AI, or jump to a specific module if
           you know what you&rsquo;re looking for. By the end you&rsquo;ll be
           ready to use the Sizer with confidence and have a productive planning
