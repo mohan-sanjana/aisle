@@ -4,6 +4,7 @@ import path from "node:path";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { MDXRemote } from "next-mdx-remote/rsc";
+import remarkGfm from "remark-gfm";
 
 import { MDX_COMPONENT_MAP } from "@/mdx-components";
 import { MODULES, getModule, moduleFilename } from "@/content/knowledge/modules";
@@ -53,7 +54,16 @@ export default async function KnowledgeModulePage({
       />
 
       <div className="prose prose-lg prose-slate max-w-[70ch]">
-        <MDXRemote source={source} components={MDX_COMPONENT_MAP} />
+        <MDXRemote
+          source={source}
+          components={MDX_COMPONENT_MAP}
+          options={{
+            mdxOptions: {
+              // GFM enables pipe tables, strikethrough, task lists, autolinks.
+              remarkPlugins: [remarkGfm],
+            },
+          }}
+        />
       </div>
 
       <ModuleNav currentSlug={slug} />
