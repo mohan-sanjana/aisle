@@ -1,4 +1,4 @@
-Whenever an organization decides to invest in AI infrastructure, the request to IT teams is likely a vague one: "stand up some GPUs for the AI team"[cite: 1]. However, unlike traditional IT workloads, running the exact same model for a background RAG application is vastly different from running it for an interactive, low-latency chat experience. In this age of AI, those IT teams that can best collaborate with the AI workload owners are likely to be the most successful. Get it wrong, and you can spend a million dollars on infrastructure that does the wrong job[cite: 1].
+Whenever an organization decides to invest in AI infrastructure, the request to IT teams is likely a vague one: "stand up some GPUs for the AI team". However, unlike traditional IT workloads, running the exact same model for a background RAG application is vastly different from running it for an interactive, low-latency chat experience. In this age of AI, those IT teams that can best collaborate with the AI workload owners are likely to be the most successful. Get it wrong, and you can spend a million dollars on infrastructure that does the wrong job.
 
 ## Two activities, very different infrastructure
 
@@ -14,21 +14,11 @@ The analogy that helps most people see the difference: **training is like writin
 
 To understand where your infrastructure resources will actually go, it helps to stretch that book analogy across the five recognized categories of AI workloads, pairing the concept with the technical reality:
 
-- **Training**
-  - *The Analogy:* Writing the book from scratch. Authors sitting in a room for months, consuming massive amounts of raw energy and data.
-  - *The Technical Truth:* Building a model from scratch by running weeks or months of compute on a frontier cluster.
-- **Fine-Tuning**
-  - *The Analogy:* Adding a custom appendix. Taking an existing book and spending a few days writing a specialized corporate chapter so it understands your company's terminology.
-  - *The Technical Truth:* Specializing a pre-trained model on a smaller, custom dataset over hours or days on a much smaller cluster.
-- **Inference**
-  - *The Analogy:* Reading the book aloud. The main event, where a user asks a question and the system reads the book aloud to give them an answer.
-  - *The Technical Truth:* Running the frozen model against real requests, delivering responses in milliseconds per request across potentially millions of queries a day.
-- **Embeddings**
-  - *The Analogy:* The card catalog. Translating raw text or data into a highly organized numerical index so the system knows exactly where to look later.
-  - *The Technical Truth:* A special kind of lightweight inference that turns text or images into mathematical vectors for search.
-- **Retrieval / RAG**
-  - *The Analogy:* Consulting the reference desk. Pulling a relevant file from your company's secure filing cabinet and placing it right in front of the reader *while* they are reading.
-  - *The Technical Truth:* Searching a vector database on every request to inject relevant, real-time context directly into the prompt.
+- **Training**: Writing the book from scratch. Authors sitting in a room for months, consuming massive amounts of raw energy and data. It's the process of building a model from scratch by running weeks or months of compute on a frontier cluster.
+- **Fine-Tuning**: Adding a custom appendix. Taking an existing book and spending a few days writing a specialized corporate chapter so it understands your company's terminology. Finetuning is how you specialize a pre-trained model on a smaller, custom dataset over hours or days on a much smaller cluster.
+- **Inference**: Reading the book aloud. The main event, where a user asks a question and the system reads the book aloud to give them an answer. It's the act of running the frozen model against real requests, delivering responses in milliseconds per request across potentially millions of queries a day.
+- **Embeddings**: The card catalog. Translating raw text or data into a highly organized numerical index so the system knows exactly where to look later. A special kind of lightweight inference that turns text or images into mathematical vectors for search.
+- **Retrieval / RAG**: Consulting the reference desk. Pulling a relevant file from your company's secure filing cabinet and placing it right in front of the reader *while* they are reading. Searching a vector database on every request to inject relevant, real-time context directly into the prompt.
 
 Here is the vital takeaway: **Inference is where the actual business value lives.** Training, fine-tuning, embeddings, and retrieval are all ultimately just in service of a model making a decision or generating text in real-time. For the vast majority of enterprise on-prem deployments, running model inference—to securely extract insights from proprietary data or run real-time analysis—is the core objective.
 
@@ -57,7 +47,7 @@ It doesn't work that way. In the AI world, the initial choices made by the data 
 
 A shift in model size can instantly dictate whether you need high-speed, intra-node fabric like NVLink, or standard PCIe slots. A longer context length requirement can drastically alter your storage throughput and cache memory layouts. The bottleneck is rarely a simple matter of CPU cycles; it's a complex interplay of memory bandwidth, power density (drawing two to three times what a standard CPU rack requires), and interconnected networking.
 
-| Metric / Concern | Traditional IT Workload | AI Inference Workload |
+| Concern | Traditional IT Workload | AI Inference Workload |
 | :--- | :--- | :--- |
 | **Primary Bottleneck** | Compute (CPU) or Network I/O | Memory Bandwidth (How fast the GPU reads its own VRAM) |
 | **Capacity Sizing** | Scaled linearly by Requests Per Second (QPS) | Dictated by model size, precision, and context length choices |
