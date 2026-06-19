@@ -434,7 +434,7 @@
     },
     {
       "id": "object-storage",
-      "tier": "Object storage (S3-compatible)",
+      "tier": "Object storage",
       "use_case": "Cold model registry, dataset archive, RAG corpus source-of-truth, KV-cache long-tail offload",
       "throughput_tier": "10-100 GB/s aggregate",
       "latency": "10-100 ms",
