@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * Lazy-loaded Mermaid renderer. The `mermaid` dep is already in package.json;
@@ -10,19 +10,40 @@ import { useEffect, useRef, useState } from "react";
  * Use sparingly. Two diagrams across the whole Knowledge curriculum:
  *   M3 — request lifecycle (sequence)
  *   M4 — memory stack (block)
+ *
+ * Accepts diagram source as either:
+ *   - `source` prop (template literal) — original API
+ *   - `children` (text node) — preferred for MDX, since next-mdx-remote v6
+ *     intermittently drops template-literal-typed attribute values when
+ *     compiling to RSC. Wrapping the source as `{` ... `}` children avoids
+ *     the round-trip through that compiler path.
  */
 export function KnowledgeMermaid({
   source,
+  children,
   caption,
 }: {
-  source: string;
+  source?: string;
+  children?: React.ReactNode;
   caption?: string;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Resolve the diagram source from whichever channel the MDX used.
+  const diagramSource = useMemo(
+    () => (source ?? extractText(children) ?? "").trim(),
+    [source, children],
+  );
+
   useEffect(() => {
     let cancelled = false;
+    if (!diagramSource) {
+      setError(
+        "No diagram source provided. Pass it via the `source` prop or as the component's children.",
+      );
+      return;
+    }
     void (async () => {
       try {
         const mermaid = (await import("mermaid")).default;
@@ -40,7 +61,7 @@ export function KnowledgeMermaid({
           },
         });
         const id = `mmd-${Math.random().toString(36).slice(2)}`;
-        const { svg } = await mermaid.render(id, source);
+        const { svg } = await mermaid.render(id, diagramSource);
         if (!cancelled && ref.current) {
           ref.current.innerHTML = svg;
         }
@@ -57,7 +78,7 @@ export function KnowledgeMermaid({
     return () => {
       cancelled = true;
     };
-  }, [source]);
+  }, [diagramSource]);
 
   return (
     <figure className="my-8 overflow-x-auto rounded-lg border border-slate-200 bg-white p-4">
@@ -72,4 +93,20 @@ export function KnowledgeMermaid({
       )}
     </figure>
   );
+}
+
+/**
+ * Recursively flatten a React node into plain text. Handles strings, arrays,
+ * and elements whose children are themselves nested. Used to read diagram
+ * source from MDX children when the `source` prop isn't supplied.
+ */
+function extractText(node: React.ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(extractText).join("");
+  if (typeof node === "object" && "props" in node) {
+    const props = (node as { props?: { children?: React.ReactNode } }).props;
+    return extractText(props?.children);
+  }
+  return "";
 }

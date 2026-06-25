@@ -1,15 +1,10 @@
-import Link from "next/link";
-
-import { MODULES } from "@/content/knowledge/modules";
+import { CurriculumNav } from "./_components/curriculum-nav";
 
 /**
  * Knowledge section layout. Persistent left sidebar at `md:` (768px) and
- * above, two-column uniform-chip grid below that.
- *
- * The active-module highlight is handled by the [slug] page; here we render
- * every module as a link. Sidebar items take the full sidebar width so widths
- * are inherently uniform; the mobile grid uses fixed columns for the same
- * reason.
+ * above, two-column uniform-chip grid below that. The active-module
+ * highlight is handled inside <CurriculumNav /> (client component, uses
+ * usePathname); the surrounding layout stays server-rendered.
  */
 export default function KnowledgeLayout({
   children,
@@ -19,37 +14,7 @@ export default function KnowledgeLayout({
   return (
     <div className="container mx-auto flex flex-col gap-8 px-4 py-10 md:flex-row md:gap-10">
       <aside className="shrink-0 md:w-60 lg:w-64">
-        <nav aria-label="Knowledge modules" className="md:sticky md:top-24">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Curriculum
-          </p>
-          {/* Mobile: uniform 2-col grid of chips. md+: vertical sidebar. */}
-          <ol className="grid grid-cols-2 gap-2 md:flex md:flex-col md:gap-0">
-            {MODULES.map((m) => (
-              <li key={m.slug}>
-                <Link
-                  href={`/knowledge/${m.slug}`}
-                  className="
-                    group flex h-full flex-col gap-0.5
-                    rounded-md border border-slate-200 px-3 py-2 no-underline
-                    transition-colors hover:border-brand-700 hover:bg-brand-50/40
-                    md:rounded-none md:border-0 md:border-l-2 md:border-transparent md:px-3 md:py-1.5
-                    md:hover:border-brand-700 md:hover:bg-brand-50/40
-                  "
-                >
-                  <span className="flex items-baseline gap-2">
-                    <span className="font-mono text-[11px] font-semibold text-brand-700">
-                      M{m.index}
-                    </span>
-                    <span className="text-sm font-medium leading-snug text-slate-900 group-hover:text-brand-800">
-                      {m.title}
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ol>
-        </nav>
+        <CurriculumNav />
       </aside>
 
       <div className="min-w-0 flex-1">{children}</div>
