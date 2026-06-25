@@ -71,8 +71,8 @@ export default function Home() {
             Plan on-prem AI inference infrastructure with confidence.
           </h1>
           <p className="mt-6 text-balance text-lg leading-relaxed text-slate-700">
-            Aisle is the planning workbench for IT teams. Walk every layer of
-            the inference stack, from GPU memory to facility power, and build a
+            Aisle - AI Sizing and Learning Environment - is the planning workbench for IT teams. Walk every layer of
+            the inference stack and build a
             sizing you can defend.
           </p>
           <p className="mt-4 text-xs text-slate-500">
@@ -97,8 +97,7 @@ export default function Home() {
             Pick where you want to start.
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600">
-            Three ways into the aisle. Choose the one that matches where you
-            are today; the others stay one click away.
+            Four ways into the aisle.
           </p>
         </header>
 
