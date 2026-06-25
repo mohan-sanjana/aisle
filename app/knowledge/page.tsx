@@ -1,8 +1,12 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 
-import { MODULES } from "@/content/knowledge/modules";
+import { MODULES, moduleFilename } from "@/content/knowledge/modules";
+import { estimateReadingTime } from "@/content/knowledge/reading-time";
 
 import { ReadingTime } from "./_components/reading-time";
 
@@ -12,8 +16,20 @@ export const metadata: Metadata = {
     "A progressive curriculum on planning on-prem AI inference infrastructure, for IT admins and data center planners.",
 };
 
-export default function KnowledgeIndexPage() {
-  const totalMinutes = MODULES.reduce(
+export default async function KnowledgeIndexPage() {
+  // Read every module's MDX in parallel at build time and compute reading
+  // time from word count. Static export bakes the result into the HTML.
+  const modulesWithTime = await Promise.all(
+    MODULES.map(async (m) => {
+      const source = await readFile(
+        path.join(process.cwd(), moduleFilename(m)),
+        "utf-8",
+      );
+      return { ...m, reading_time_minutes: estimateReadingTime(source) };
+    }),
+  );
+
+  const totalMinutes = modulesWithTime.reduce(
     (sum, m) => sum + m.reading_time_minutes,
     0,
   );
@@ -22,7 +38,7 @@ export default function KnowledgeIndexPage() {
     <article className="max-w-3xl">
       <header className="mb-10">
         <p className="text-xs font-semibold uppercase tracking-wider text-brand-700">
-          Curriculum · 7 modules · ~{totalMinutes} min
+          Curriculum · {modulesWithTime.length} modules · ~{totalMinutes} min
         </p>
         <h1 className="mt-2 text-4xl font-bold leading-tight tracking-tight text-slate-900">
           A working knowledge of on-prem AI inference
@@ -37,7 +53,7 @@ export default function KnowledgeIndexPage() {
       </header>
 
       <ol className="flex flex-col gap-2">
-        {MODULES.map((m) => (
+        {modulesWithTime.map((m) => (
           <li key={m.slug}>
             <Link
               href={`/knowledge/${m.slug}`}

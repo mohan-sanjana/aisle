@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm";
 
 import { MDX_COMPONENT_MAP } from "@/mdx-components";
 import { MODULES, getModule, moduleFilename } from "@/content/knowledge/modules";
+import { estimateReadingTime } from "@/content/knowledge/reading-time";
 
 import { ModuleHeader } from "../_components/module-header";
 import { ModuleNav } from "../_components/module-nav";
@@ -43,6 +44,7 @@ export default async function KnowledgeModulePage({
   // next-mdx-remote compile + render with the registered components.
   const filepath = path.join(process.cwd(), moduleFilename(m));
   const source = await readFile(filepath, "utf-8");
+  const readingTimeMinutes = estimateReadingTime(source);
 
   return (
     <article className="max-w-3xl">
@@ -50,7 +52,7 @@ export default async function KnowledgeModulePage({
         index={m.index}
         title={m.title}
         learningObjective={m.learning_objective}
-        readingTimeMinutes={m.reading_time_minutes}
+        readingTimeMinutes={readingTimeMinutes}
       />
 
       <div className="prose prose-lg prose-slate max-w-[70ch]">
