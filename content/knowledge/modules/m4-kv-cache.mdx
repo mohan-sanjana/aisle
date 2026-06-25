@@ -30,14 +30,7 @@ Picture a 70B model at FP8 serving an enterprise RAG application. Average prompt
 
 The memory budget looks like this:
 
-<KnowledgeMermaid caption="Total: ~180 GB. Fits comfortably on two H200s (282 GB combined) or two MI300X cards. Does not fit on two H100s (160 GB combined).">
-{`pie
-    title VRAM budget: 70B FP8, 64 in-flight requests at 6K avg context
-    "Model weights (fixed)" : 70
-    "KV cache (64 requests x 1 GB)" : 64
-    "Activations" : 10
-    "Headroom (25%)" : 36`}
-</KnowledgeMermaid>
+<KnowledgeMermaid name="vram-budget-70b" caption="Total: ~180 GB. Fits comfortably on two H200s (282 GB combined) or two MI300X cards. Does not fit on two H100s (160 GB combined)." />
 
 The exact same workload on the exact same model lands on different hardware depending on a single parameter you might have brushed past in the spec: the average context length.
 

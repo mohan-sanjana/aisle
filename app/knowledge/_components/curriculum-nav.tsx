@@ -13,8 +13,12 @@ import { MODULES } from "@/content/knowledge/modules";
  * `usePathname` to detect the active route; the surrounding layout stays
  * server-rendered.
  */
+/** Strip a single trailing slash so a path matches whether or not the
+ *  framework appended one (Next.js static export does, dev server does not). */
+const normalize = (p: string) => (p.length > 1 && p.endsWith("/") ? p.slice(0, -1) : p);
+
 export function CurriculumNav() {
-  const pathname = usePathname() ?? "";
+  const pathname = normalize(usePathname() ?? "");
 
   return (
     <nav aria-label="Knowledge modules" className="md:sticky md:top-24">

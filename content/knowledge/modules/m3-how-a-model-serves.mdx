@@ -39,27 +39,7 @@ Because these phases have completely opposite hardware demands, running them sid
 
 A request from the user's keyboard to the streamed response looks like this:
 
-<KnowledgeMermaid caption="A single request, from authentication to streamed response. Prefill happens once, in parallel. Decode happens once per output token, sequentially.">
-{`sequenceDiagram
-    autonumber
-    participant U as User
-    participant API as API Gateway
-    participant Srv as Inference Server
-    participant GPU as GPU(s)
-
-    U->>API: POST /chat with prompt
-    API->>Srv: validated request
-    Srv->>GPU: prompt tokens
-    Note over GPU: PREFILL: read all tokens in parallel, build KV cache
-    GPU-->>Srv: first output token
-    Srv-->>U: stream first token (TTFT)
-
-    loop For each remaining output token
-      Note over GPU: DECODE: read weights + KV cache from memory, generate next token
-      GPU->>Srv: next token
-      Srv->>U: stream token (TPOT)
-    end`}
-</KnowledgeMermaid>
+<KnowledgeMermaid name="request-lifecycle" caption="A single request, from authentication to streamed response. Prefill happens once, in parallel. Decode happens once per output token, sequentially." />
 
 The total wall-clock time the user waits is TTFT plus the number of output tokens multiplied by TPOT. A 300-token answer at 30 ms per token plus a 200 ms prefill takes about 9.2 seconds. Streamed back token by token, this feels natural. Delivered as a single response at the end, it would feel slow.
 

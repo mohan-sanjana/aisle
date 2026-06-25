@@ -2,27 +2,33 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { DIAGRAMS, type DiagramName } from "@/content/knowledge/diagrams";
+
 /**
  * Lazy-loaded Mermaid renderer. The `mermaid` dep is already in package.json;
  * we dynamically import it client-side so it doesn't block SSR or bloat the
  * initial bundle.
  *
- * Use sparingly. Two diagrams across the whole Knowledge curriculum:
- *   M3 — request lifecycle (sequence)
- *   M4 — memory stack (block)
+ * Preferred MDX usage is the registry form, which is bulletproof against
+ * next-mdx-remote v6's flaky JSX expression serialization:
  *
- * Accepts diagram source as either:
- *   - `source` prop (template literal) — original API
- *   - `children` (text node) — preferred for MDX, since next-mdx-remote v6
- *     intermittently drops template-literal-typed attribute values when
- *     compiling to RSC. Wrapping the source as `{` ... `}` children avoids
- *     the round-trip through that compiler path.
+ *   <KnowledgeMermaid name="request-lifecycle" caption="..." />
+ *
+ * The `name` prop is just a plain string attribute — no template literals,
+ * no expression children — so it always survives the MDX -> RSC -> client
+ * compile path. The actual diagram source lives in
+ * `content/knowledge/diagrams.ts`.
+ *
+ * `source` and `children` are still accepted for ad-hoc one-off diagrams,
+ * but the registry form should be preferred.
  */
 export function KnowledgeMermaid({
+  name,
   source,
   children,
   caption,
 }: {
+  name?: DiagramName | string;
   source?: string;
   children?: React.ReactNode;
   caption?: string;
@@ -31,10 +37,14 @@ export function KnowledgeMermaid({
   const [error, setError] = useState<string | null>(null);
 
   // Resolve the diagram source from whichever channel the MDX used.
-  const diagramSource = useMemo(
-    () => (source ?? extractText(children) ?? "").trim(),
-    [source, children],
-  );
+  // Priority: explicit `source` prop > registry lookup by `name` > children.
+  const diagramSource = useMemo(() => {
+    if (source) return source.trim();
+    if (name && name in DIAGRAMS) {
+      return DIAGRAMS[name as DiagramName].trim();
+    }
+    return extractText(children).trim();
+  }, [name, source, children]);
 
   useEffect(() => {
     let cancelled = false;
