@@ -1,62 +1,107 @@
-The previous module introduced the KV cache as the conversation's working memory. This module is about why that working memory is the single biggest determinant of how many users your infrastructure can serve at once.
+The previous module introduced the KV cache as the conversation's working memory. This module covers why that working memory is the single biggest determinant of how many users your infrastructure can serve at once.
 
-If you take one thing from this module, take this. The KV cache grows in two directions, with context length and with concurrent users, and the two multiply. When you change either one, the memory budget moves by a lot, not a little.
+If you take one thing from this module, take this: the KV cache grows in two directions simultaneously, with context length and with concurrent users, and the two multiply. When you change either one, your memory budget moves by an order of magnitude, not a small percentage.
 
 ## What actually lives in the KV cache
 
-When the model reads a prompt during prefill, it computes intermediate values for every token. The model could throw these away and recompute them as needed, but that would be wildly expensive. The math says: store them, and reuse them.
+When a model reads a prompt during the <GlossaryTerm id="prefill">prefill</GlossaryTerm> phase, it computes intermediate values for every single token. The model could throw these values away and recompute them on every single step of the <GlossaryTerm id="decode">decode</GlossaryTerm> loop, but that would be wildly expensive and tank performance. The math dictates a smarter path: store them and reuse them.
 
-These stored intermediate values are the KV cache. The name comes from the math of attention, the mechanism that lets each token "see" the others. For every token in a conversation, the model stores two vectors, called the key and the value, in the GPU's high-bandwidth memory.
+These stored intermediate values are the <GlossaryTerm id="kv_cache">KV cache</GlossaryTerm>. The name comes from the math of attention, the core mechanism that lets each token look back at every other token in a sequence. This is how the model contextualizes words. The model understands that the word "bank" means a financial institution in one sentence or a river edge in another, based entirely on its relationship to the surrounding words. For every token in a conversation, the model stores two vectors, called the key and the value, directly in the GPU's high-bandwidth memory (<GlossaryTerm id="hbm">HBM</GlossaryTerm>).
 
-Two facts about this storage matter.
+Two non-negotiable infrastructure facts govern this storage:
 
-First, the amount of storage per token is fixed by the model. A given model uses a specific number of bytes per token, regardless of what the token is. The exact number depends on the model's architecture, the data type, and how attention heads are grouped. For Llama 3.1 70B at FP8, each token takes roughly 160 kilobytes of KV cache space.
+1. The storage footprint per token is fixed by the model's architecture. A given model uses a specific number of bytes per token, regardless of what text or characters are being processed. This remains true for even modern <GlossaryTerm id="moe">Mixture-of-Experts (MoE)</GlossaryTerm> models. While the routing "experts" switch out dynamically, the underlying attention head architecture still dictates a fixed memory cost per token.
+2. That storage must live exclusively in ultra-expensive HBM, right alongside the model weights themselves. There is no fluid spilling to system RAM or swapping to local disk without destroying your latency targets. Every active conversation's memory is aggressively competing for the exact same physical VRAM footprint as the model itself.
 
-Second, that storage lives in HBM, the same memory the model weights live in. There is no spilling to RAM, no swap to disk. Every active conversation's KV cache is competing for the same physical space as the weights themselves.
+## Deconstructing the math: a Llama 3.1 70B sandbox
 
-## How it scales
+To see how these numbers materialize on a spec sheet, let's open the hood of a standard enterprise baseline: Llama 3.1 70B running at <GlossaryTerm id="fp8">FP8</GlossaryTerm> precision.
 
-If one token takes 160 kilobytes, then a 1,000-token conversation takes about 160 megabytes. A 10,000-token conversation takes 1.6 gigabytes. A 128,000-token conversation, which is what Llama 3.1 supports at maximum, takes roughly 40 gigabytes. For one user.
+As a quick primer, FP8 (8-bit floating point) means each individual weight or mathematical element is compressed down to exactly 1 byte of data. This cuts the model's physical footprint in half compared to standard legacy 16-bit precision (BF16).
 
-That last number is the one to internalize. A Llama 3.1 70B model, at FP8, with a single user holding 128,000 tokens of conversation history, uses 40 gigabytes of GPU memory just to remember the conversation. That is more than half the size of the model itself.
+The physical size of a single token's KV cache is calculated using a fixed architectural formula:
 
-Now multiply by concurrency. If five users are simultaneously holding 128K contexts, you need 200 gigabytes of KV cache space, plus 70 gigabytes for the weights, plus a margin for activations and headroom. You have just walked past the limit of a single H100 with 80 gigabytes of memory.
+```
+KV bytes per token = 2 × Layers × KV heads × Head dimension × Bytes per element
+```
 
-This is the multiplication that traditional planning misses. The headline is the model size. The reality is the model size, plus context length times concurrent users times bytes per token.
+For Llama 3.1 70B, the hardware spec sheet lists the following constants:
+
+- **Layers:** 80
+- **Key-value heads:** 8 (using <GlossaryTerm id="gqa">Grouped-Query Attention</GlossaryTerm>)
+- **Head dimension:** 128
+- **Bytes per element:** 1 byte (due to FP8 precision)
+
+When you multiply it out:
+
+```
+2 × 80 × 8 × 128 × 1 = 163,840 bytes ≈ 160 KB per token
+```
+
+## How it scales: the browser tab trap
+
+If one single token requires 160 kilobytes of dedicated VRAM, a standard 1,000-token conversation consumes about 160 megabytes. That feels small, but look at what happens as context lengths expand to modern enterprise requirements:
+
+- A 10,000-token document interaction takes 1.6 gigabytes.
+- A 128,000-token context window, the maximum supported by modern models, takes roughly 40 gigabytes of memory. And that is for one single user.
+
+To understand why this creates an infrastructure crisis, think of the KV cache like keeping heavy, media-rich tabs open in a modern web browser.
+
+Imagine opening a single browser tab to view a massive 100-page corporate report (a long context length). Your browser caches that entire file in RAM so you can scroll smoothly. As long as you leave that tab open, it continues to hold a permanent block of memory.
+
+Now, imagine the multi-dimensional scaling trap: open 64 separate browser tabs at the exact same time (high concurrency), with each tab loading a completely different 100-page corporate report (long context). Your computer's system RAM will rapidly vanish. If you exceed your physical memory ceiling, the browser tabs will instantly crash.
+
+This is exactly how VRAM behaves inside a GPU. It is incredibly easy to be solely focused on model size when building a cluster footprint. A team picks a 70B model, multiplies 70 GB by an operational buffer, and feels reasonably confident. But the moment 5 corporate users upload massive document archives totaling 128,000 tokens simultaneously, you suddenly need 200 gigabytes of KV cache space, plus 70 gigabytes for the frozen model weights. You have just rocketed past the 160 GB memory limit of two combined NVIDIA H100 GPUs.
+
+The reality is a strict equation where context and concurrency multiply:
+
+```
+Total VRAM needed = Model size + (Context length × Concurrent users × Bytes per token)
+```
 
 ## A concrete budget
 
-Picture a 70B model at FP8 serving an enterprise RAG application. Average prompt is 6,000 tokens of retrieved context plus chat history. Peak concurrent in-flight requests is 64. Each request's KV cache takes about 1 gigabyte at this context length.
+Picture a 70B model at FP8 serving an enterprise Retrieval-Augmented Generation (RAG) application:
 
-The memory budget looks like this:
+- **Average prompt:** 6,000 tokens of retrieved internal documentation and chat history.
+- **Peak concurrency:** 64 active, in-flight requests processing simultaneously.
+
+At 6,000 tokens, each individual user's active "browser tab" cache takes up roughly 1 gigabyte of VRAM. Multiply that by 64 concurrent users, and the engine requires a hard baseline of 64 GB of memory exclusively for user state.
+
+The physical hardware budget breaks down like this:
+
+- Model weights (FP8): 70 GB
+- KV cache (64 users × 6K context): 64 GB
+- Headroom, activations, and overhead: ~46 GB
+- **Total VRAM required: ~180 GB**
 
 <KnowledgeMermaid name="vram-budget-70b" caption="Total: ~180 GB. Fits comfortably on two H200s (282 GB combined) or two MI300X cards. Does not fit on two H100s (160 GB combined)." />
 
-The exact same workload on the exact same model lands on different hardware depending on a single parameter you might have brushed past in the spec: the average context length.
+This workload fits comfortably across two H200s (282 GB combined) or two AMD MI300X cards. It will fail to load entirely on two standard H100s (160 GB combined).
 
-Halve the context to 3,000 tokens and the KV cache drops to 32 GB. Now the workload fits on two H100s. Double the context to 12,000 tokens and the KV cache becomes 128 GB. Now you need three H200s, or you need to quantize KV separately, or you need to revisit the conversation about whether 12,000 tokens of context is actually necessary for this use case.
+The exact same workload, running on the exact same model, will land on completely different hardware tiers based on a single parameter: context length. If you halve the context to 3,000 tokens, the KV cache drops to 32 GB, allowing the entire system to fit neatly onto two standard H100s. If you double the context to 12,000 tokens, the KV cache swells to 128 GB. Suddenly, you need to purchase a third H200 card, implement separate quantization recipes, or have a direct conversation with the product team about whether a 12,000-token history window is actually an absolute business requirement.
 
 ## Why this is the silent killer
 
-Most planning conversations focus on the model size. A team picks a 70B model. The IT side computes 70 GB times some factor, calls it 150 GB, and feels reasonably confident.
+The KV cache remains a silent killer because it rarely appears on standard software intake forms. The AI development team rarely calculates it explicitly because their serving runtime abstracts it away. The infrastructure team has no true equivalent to this behavior in traditional software architectures. As a result, the compounding multiplication of context length and concurrency slips right through the organizational gap.
 
-The KV cache is silent because nobody mentions it. The AI team rarely thinks about it explicitly because their serving engine handles it for them. The IT team has no equivalent in traditional infrastructure. So the multiplication of context length and concurrency, the thing that drives the actual memory footprint, slips through the gap.
+To fix this, you must mandate three explicit questions before sizing any inference cluster:
 
-The fix is to ask three specific questions before any sizing exercise. What is the maximum context length the application supports? What is the realistic peak concurrent in-flight request count? What precision will the KV cache be stored in? These three numbers, multiplied, give you the KV budget. Add the model weights. That is your honest memory floor.
+1. What is the hard maximum context length the application will accept?
+2. What is the realistic, absolute peak of concurrent, in-flight requests?
+3. What specific precision (e.g., FP8) will the KV cache be stored in?
 
-## What helps
+Multiplying those three numbers gives you your honest KV memory budget. Add the base model weights, and you have your true physical infrastructure floor.
 
-A few choices reduce KV pressure without changing the application.
+## What helps: infrastructure dials to turn
 
-Quantizing the KV cache to FP8 halves its size, often with negligible quality loss. Some serving engines offer this as a toggle; some require explicit configuration.
+If your engineering team hits a hard memory wall, there are architectural choices that can reduce KV pressure without changing the core model:
 
-Some model architectures use a technique called <GlossaryTerm id="mla">MLA</GlossaryTerm> that compresses KV by roughly ten times. DeepSeek-V3 is the best-known example. If KV pressure is the limiting factor, the choice of model architecture starts to matter more than the parameter count.
+- **KV cache quantization (FP8).** Much like compressing the model itself, modern inference engines can compress the KV cache from 16-bit down to 8-bit. This acts as a no-compromise compression switch, cutting the active memory footprint in half instantly with negligible loss in response quality.
+- **Alternative model architectures (MLA).** Some frontier model architectures use <GlossaryTerm id="mla">Multi-Latent Attention (MLA)</GlossaryTerm>. This mechanism mathematically compresses the hidden attention vectors by up to 10x. If KV memory pressure is your primary cluster bottleneck, migrating to an MLA-native architecture (such as DeepSeek-V3) can turn a 40 GB storage crisis into a manageable 4 GB footprint.
+- **Strict context caps.** The simplest and most effective optimization tool is boundaries. Long context limits are frequently inherited from a model's default spec sheet without being validated against actual business needs. Capping an application's context at 16K or 32K tokens when it supports 128K leaves massive amounts of wasted hardware headroom on the table.
 
-Some serving engines support offloading cold KV blocks to CPU RAM or NVMe, trading latency for capacity. This is operationally complex and usually reserved for very large deployments.
-
-The simplest thing, when KV pressure is the limit, is to cap the context length the application accepts. Long contexts are often inherited from the model's spec without being needed by the application. Capping at 16K or 32K tokens when the model supports 128K leaves significant headroom on the table.
-
-The next module names the seven parameters that drive every sizing decision. Two of them, context length and concurrency, are what you have just seen multiplied here. The other five round out the planning conversation.
+The next module introduces the seven definitive parameters that drive every infrastructure sizing equation. Two of them, context length and concurrency, are the forces you just watched multiply here. The remaining five will round out your operational toolkit.
 
 <TryInSizer
   prompt="Open the Sizer with a 128K-token context and watch the memory budget swell. Then drop max_context_tokens to 8,000 and see the recommendation collapse to fewer GPUs. This is what context length pressure looks like in practice."
