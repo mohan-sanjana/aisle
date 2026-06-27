@@ -24,7 +24,7 @@ const entryPoints: ReadonlyArray<EntryPoint> = [
     eyebrow: "New to AI infrastructure?",
     title: "Start with the fundamentals.",
     description:
-      "Eight short modules walk you from what inference actually is to how to size and plan an on-prem deployment. About 40 minutes end to end.",
+      "Short educational modules to learn what inference actually is, what components are involved, and how to size and plan an on-prem deployment.",
     cta: "Start learning",
     icon: BookOpen,
   },
@@ -51,7 +51,7 @@ const entryPoints: ReadonlyArray<EntryPoint> = [
     eyebrow: "Already have a sizing?",
     title: "Visualize the topology.",
     description:
-      "Turn a sizing into a deployment archetype with a topology diagram. Picks between single-node, multi-GPU, and multi-node TP+PP patterns based on your inputs.",
+      "Turn a sizing into a deployment archetype with a topology diagram. Picks between single-node, multi-GPU, and multi-node patterns based on your inputs.",
     cta: "Open Designer",
     icon: Network,
     comingSoon: true,

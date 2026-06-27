@@ -1,0 +1,31 @@
+The previous module showed how the KV cache grows with both context length and concurrency, and how the multiplication of those two factors quickly exceeds your hardware budget. This module covers what you can do about it without buying more GPUs.
+
+There are three architectural levers that reduce KV pressure without changing the core model. Each one trades a different thing, and they stack.
+
+## KV cache quantization (FP8)
+
+The KV cache, like the model weights, can be compressed from 16-bit to 8-bit storage. Modern inference engines treat this as a simple toggle. Flipping it cuts the active memory footprint in half instantly, with negligible loss in response quality for production workloads.
+
+Quantizing the KV cache is the highest-leverage change you can make in production. It is the first thing to enable when memory pressure shows up. The 2026 production baseline assumes it is already on.
+
+## Alternative model architectures (MLA)
+
+Some frontier model architectures use <GlossaryTerm id="mla">Multi-Latent Attention (MLA)</GlossaryTerm>. This mechanism mathematically compresses the hidden attention vectors by up to 10x. If KV memory pressure is your primary cluster bottleneck, migrating to an MLA-native architecture (such as DeepSeek-V3) can turn a 40 GB storage crisis into a manageable 4 GB footprint.
+
+The trade is that you have to use a model whose architecture supports MLA. This is a model selection decision more than an infrastructure one, but the infrastructure consequences are large enough that the IT team should know to ask about it.
+
+## Strict context caps
+
+The simplest and most effective optimization tool is boundaries. Long context limits are frequently inherited from a model's default spec sheet without being validated against actual business needs. Capping an application's context at 16K or 32K tokens when it supports 128K leaves massive amounts of wasted hardware headroom on the table.
+
+This is the lever the application team controls, not the infrastructure team. The conversation needs to happen explicitly. If nobody asks, the context cap stays at whatever the model defaults to, which is almost always larger than the application actually needs.
+
+## A note on ordering
+
+Of the three levers, KV cache quantization is the cheapest to turn on and lands first. Context caps are the easiest to negotiate but require a real conversation with the application team. MLA is the heaviest lever and only makes sense at the moment of a new model selection.
+
+In practice, most teams enable KV quantization by default, talk to the application team about context caps when production pressure shows up, and reach for MLA only when a new model selection is on the table.
+
+## What comes next
+
+You now have the diagnostic vocabulary (KV cache, HBM, bandwidth) and the levers to manage them. The next module steps back and revisits the four assumptions traditional infrastructure planning makes about AI workloads. With this part's vocabulary in mind, each one breaks for a reason you can now name.

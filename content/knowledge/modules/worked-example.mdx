@@ -1,16 +1,16 @@
-M5 listed the seven parameters. This module fills them in with a real workload and walks the answer end-to-end. By the time you reach the recommendation at the bottom, you should be able to predict the shape of the output before reading it, and trace each number back to an input.
+The previous module gave you the seven parameters as an abstract list. This module fills them in with a real workload and walks the answer end to end. By the time you reach the recommendation at the bottom, you should be able to predict the shape of the output before reading it, and trace each number back to an input.
 
-The workload is realistic on purpose. A regional bank wants to roll out an internal RAG chatbot that answers employee questions against the bank's policy documents. The use case is concrete enough to ground every input. The math is the same math the Sizer runs.
+A regional bank wants to roll out an internal RAG chatbot that answers employee questions against the bank's policy documents.
 
 ## The workload
 
-A retail bank with about 4,000 employees. The application is an internal RAG assistant. Employees ask questions like "what is our overdraft policy for small-business accounts?" The system retrieves the relevant policy passages and the model writes a grounded answer.
+In this example, we will consider a fictional regional bank with about 4,000 employees. The application is an internal RAG assistant. Employees ask the model questions like "what is our overdraft policy for small-business accounts?" The system retrieves the relevant policy passages and the model writes a grounded answer.
 
-Compliance requires this to run on-prem, in the bank's own data centers, with no third-party API calls. The AI team has chosen Llama 3.3-70B, the latest in the open-weight 70B class, with vLLM as the serving engine. The IT team owns the hardware sizing.
+Compliance requires this workload to run on-prem, in the bank's own data centers, with no third-party API calls. The AI team has chosen Llama 3.3-70B, the latest in the open-weight 70B class, with vLLM as the serving engine. The IT team owns the hardware sizing.
 
 ## The seven inputs
 
-Walking the list from M5.
+Walking the list from the previous module.
 
 **1. Model size: 70B.** Llama 3.3-70B, a dense GQA model. Standard architecture.
 
@@ -32,9 +32,31 @@ Operational defaults: N+1 redundancy (one spare replica), vLLM as the engine.
 
 **Weights.** 70 billion parameters at one byte each is 70 GB. That is the floor on GPU memory before any conversation starts.
 
-**KV per request.** Using the model architecture defaults for Llama 3.3-70B (80 layers, 8 KV heads, head dim 128), at 6,250 tokens of average context, with FP8 KV. The KV cache works out to about 1 GB per request.
+**KV per request.** Llama 3.3-70B has the standard architecture defaults: 80 layers, 8 KV heads, head dimension 128. At FP8, each KV element takes 1 byte. The KV cache formula from the KV cache module gives:
 
-**In-flight requests.** RPS is 80 users times 4 requests per minute divided by 60, which is 5.3 RPS. Each request takes about 10 seconds to finish generating its 250 output tokens at TPOT of 40 ms per token. Little's Law says steady-state in-flight is the arrival rate times the service time, so 5.3 × 10 = 53. Multiply by the 2.5x burst factor to absorb the peak: 133 simultaneous requests.
+```
+KV bytes per token = 2 × 80 × 8 × 128 × 1 = 163,840 bytes ≈ 160 KB per token
+```
+
+At 6,250 tokens of average context, that works out to 160 KB × 6,250 ≈ 1 GB per request.
+
+**In-flight requests.** Two intermediate numbers feed this calculation.
+
+First, the request rate. 80 concurrent users sending 4 requests per minute each works out to:
+
+```
+RPS = 80 users × 4 requests/min ÷ 60 = 5.3 requests per second
+```
+
+Second, the time each request takes to complete. With 250 output tokens at a TPOT of 40 ms per token, each request runs for 250 × 0.040 = 10 seconds.
+
+To turn those two numbers into a count of in-flight requests, we use Little's Law. Little's Law is a classical result from queueing theory: in any stable system, the average number of items in the system equals the arrival rate times the average time each item spends in it. Applied to this workload:
+
+```
+In-flight requests = RPS × seconds per request = 5.3 × 10 = 53 requests
+```
+
+Multiply by the 2.5x burst factor to absorb peak load, and the cluster has to hold **133 simultaneous requests** at any moment of peak.
 
 **Total KV.** 133 requests times 1 GB per request is 133 GB of working memory.
 
@@ -84,9 +106,9 @@ If burst factor were 1.0 instead of 2.5 (sized for the average, no burst headroo
 
 ## The takeaway
 
-The recommendation, "four HGX H200 chassis with 100 GbE frontend," looks deceptively simple. It is fifteen sequential calculations chained together, every one of which depends on the seven inputs from M5. Once you have done one of these by hand, the Sizer's output stops feeling like a black box.
+The recommendation, "four HGX H200 chassis with 100 GbE frontend," looks deceptively simple. It is fifteen sequential calculations chained together, every one of which depends on the seven inputs from the previous module. Once you have done one of these by hand, the Sizer's output stops feeling like a black box.
 
-The next module is the planning checklist. It names which of these inputs is owned by IT, which by the AI team, and which by the application owner, plus the red flags to surface in the conversation before the spreadsheet exists.
+Part III closes here with a complete sized spec on paper. The next part of the curriculum makes the spec physical. What does one of those four HGX H200 chassis actually contain? CPU class, RAM, NVMe, NICs, power draw, cooling tier. The next module walks every layer.
 
 <TryInSizer
   prompt="Open the Sizer with the exact inputs from this module and see the recommendation reproduce step for step. Then tweak one input at a time and watch which numbers move."

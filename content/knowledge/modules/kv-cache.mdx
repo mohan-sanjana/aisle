@@ -1,4 +1,4 @@
-The previous module introduced the KV cache as the conversation's working memory. This module covers why that working memory is the single biggest determinant of how many users your infrastructure can serve at once.
+The last module ended with HBM holding three things: the model weights, the KV cache, and a small overhead. The model weights you already understand. This module covers the second tenant, the KV cache, and why it ends up being the single biggest determinant of how many users your infrastructure can serve.
 
 If you take one thing from this module, take this: the KV cache grows in two directions simultaneously, with context length and with concurrent users, and the two multiply. When you change either one, your memory budget moves by an order of magnitude, not a small percentage.
 
@@ -11,13 +11,11 @@ These stored intermediate values are the <GlossaryTerm id="kv_cache">KV cache</G
 Two non-negotiable infrastructure facts govern this storage:
 
 1. The storage footprint per token is fixed by the model's architecture. A given model uses a specific number of bytes per token, regardless of what text or characters are being processed. This remains true for even modern <GlossaryTerm id="moe">Mixture-of-Experts (MoE)</GlossaryTerm> models. While the routing "experts" switch out dynamically, the underlying attention head architecture still dictates a fixed memory cost per token.
-2. That storage must live exclusively in ultra-expensive HBM, right alongside the model weights themselves. There is no fluid spilling to system RAM or swapping to local disk without destroying your latency targets. Every active conversation's memory is aggressively competing for the exact same physical VRAM footprint as the model itself.
+2. That storage must live exclusively in ultra-expensive HBM, right alongside the model weights themselves. Every active conversation's memory is aggressively competing for the exact same physical VRAM footprint as the model itself.
 
 ## Deconstructing the math: a Llama 3.1 70B sandbox
 
-To see how these numbers materialize on a spec sheet, let's open the hood of a standard enterprise baseline: Llama 3.1 70B running at <GlossaryTerm id="fp8">FP8</GlossaryTerm> precision.
-
-As a quick primer, FP8 (8-bit floating point) means each individual weight or mathematical element is compressed down to exactly 1 byte of data. This cuts the model's physical footprint in half compared to standard legacy 16-bit precision (BF16).
+To see how these numbers materialize on a spec sheet, let's open the hood of a standard enterprise baseline: Llama 3.1 70B running at <GlossaryTerm id="fp8">FP8</GlossaryTerm> precision (8-bit floating point, or 1 byte of data per parameter).
 
 The physical size of a single token's KV cache is calculated using a fixed architectural formula:
 
@@ -38,20 +36,14 @@ When you multiply it out:
 2 × 80 × 8 × 128 × 1 = 163,840 bytes ≈ 160 KB per token
 ```
 
-## How it scales: the browser tab trap
+## How it scales
 
 If one single token requires 160 kilobytes of dedicated VRAM, a standard 1,000-token conversation consumes about 160 megabytes. That feels small, but look at what happens as context lengths expand to modern enterprise requirements:
 
 - A 10,000-token document interaction takes 1.6 gigabytes.
 - A 128,000-token context window, the maximum supported by modern models, takes roughly 40 gigabytes of memory. And that is for one single user.
 
-To understand why this creates an infrastructure crisis, think of the KV cache like keeping heavy, media-rich tabs open in a modern web browser.
-
-Imagine opening a single browser tab to view a massive 100-page corporate report (a long context length). Your browser caches that entire file in RAM so you can scroll smoothly. As long as you leave that tab open, it continues to hold a permanent block of memory.
-
-Now, imagine the multi-dimensional scaling trap: open 64 separate browser tabs at the exact same time (high concurrency), with each tab loading a completely different 100-page corporate report (long context). Your computer's system RAM will rapidly vanish. If you exceed your physical memory ceiling, the browser tabs will instantly crash.
-
-This is exactly how VRAM behaves inside a GPU. It is incredibly easy to be solely focused on model size when building a cluster footprint. A team picks a 70B model, multiplies 70 GB by an operational buffer, and feels reasonably confident. But the moment 5 corporate users upload massive document archives totaling 128,000 tokens simultaneously, you suddenly need 200 gigabytes of KV cache space, plus 70 gigabytes for the frozen model weights. You have just rocketed past the 160 GB memory limit of two combined NVIDIA H100 GPUs.
+Now multiply by concurrency. It is easy to focus only on model size when building a cluster footprint. A team picks a 70B model, multiplies 70 GB by an operational buffer, and feels reasonably confident. But the moment 5 corporate users upload massive document archives totaling 128,000 tokens simultaneously, you suddenly need 200 gigabytes of KV cache space, plus 70 gigabytes for the frozen model weights. You have just rocketed past the 160 GB memory limit of two combined NVIDIA H100 GPUs.
 
 The reality is a strict equation where context and concurrency multiply:
 
@@ -66,7 +58,7 @@ Picture a 70B model at FP8 serving an enterprise Retrieval-Augmented Generation 
 - **Average prompt:** 6,000 tokens of retrieved internal documentation and chat history.
 - **Peak concurrency:** 64 active, in-flight requests processing simultaneously.
 
-At 6,000 tokens, each individual user's active "browser tab" cache takes up roughly 1 gigabyte of VRAM. Multiply that by 64 concurrent users, and the engine requires a hard baseline of 64 GB of memory exclusively for user state.
+At 6,000 tokens, each individual user's KV cache takes up roughly 1 gigabyte of VRAM. Multiply that by 64 concurrent users, and the engine requires a hard baseline of 64 GB of memory exclusively for user state.
 
 The physical hardware budget breaks down like this:
 
@@ -93,15 +85,9 @@ To fix this, you must mandate three explicit questions before sizing any inferen
 
 Multiplying those three numbers gives you your honest KV memory budget. Add the base model weights, and you have your true physical infrastructure floor.
 
-## What helps: infrastructure dials to turn
+## What comes next
 
-If your engineering team hits a hard memory wall, there are architectural choices that can reduce KV pressure without changing the core model:
-
-- **KV cache quantization (FP8).** Much like compressing the model itself, modern inference engines can compress the KV cache from 16-bit down to 8-bit. This acts as a no-compromise compression switch, cutting the active memory footprint in half instantly with negligible loss in response quality.
-- **Alternative model architectures (MLA).** Some frontier model architectures use <GlossaryTerm id="mla">Multi-Latent Attention (MLA)</GlossaryTerm>. This mechanism mathematically compresses the hidden attention vectors by up to 10x. If KV memory pressure is your primary cluster bottleneck, migrating to an MLA-native architecture (such as DeepSeek-V3) can turn a 40 GB storage crisis into a manageable 4 GB footprint.
-- **Strict context caps.** The simplest and most effective optimization tool is boundaries. Long context limits are frequently inherited from a model's default spec sheet without being validated against actual business needs. Capping an application's context at 16K or 32K tokens when it supports 128K leaves massive amounts of wasted hardware headroom on the table.
-
-The next module introduces the seven definitive parameters that drive every infrastructure sizing equation. Two of them, context length and concurrency, are the forces you just watched multiply here. The remaining five will round out your operational toolkit.
+The next module covers three architectural levers that reduce KV pressure without buying more GPUs. After that, Part II closes by revisiting the four assumptions that traditional infrastructure planning makes about AI workloads, all of which now break for reasons you can name.
 
 <TryInSizer
   prompt="Open the Sizer with a 128K-token context and watch the memory budget swell. Then drop max_context_tokens to 8,000 and see the recommendation collapse to fewer GPUs. This is what context length pressure looks like in practice."

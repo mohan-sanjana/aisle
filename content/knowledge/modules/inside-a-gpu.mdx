@@ -1,0 +1,80 @@
+We learnt in the last module that to produce one output token, the GPU needs to sweep the entire model across its memory bus, then does it again for the next token. The bottleneck is **memory bandwidth**, not compute. This module is about what that actually means inside the silicon, and why the GPU memory bandwidth, a simple number on a spec, has such an outsized impact on your infrastructure plan.
+
+## A GPU is two things in one package
+
+When most IT teams hear "GPU," they think of a fast processor. That's only half right. A modern data-center GPU is two things glued together: a set of compute units and a slab of very fast memory that sits inches away from those compute units. The two halves are wired together by a memory bus that is the widest, fastest connection in the entire chassis.
+
+The compute units do the math. The memory holds the model. The memory bus moves the data between them. If any of the three is too slow, the whole thing is too slow.
+
+For inference, the bottleneck is almost always the memory bus.
+
+## HBM: the model's home
+
+The memory that holds the model is called <GlossaryTerm id="hbm">High Bandwidth Memory (HBM)</GlossaryTerm>. It is a special class of memory designed to do one job extremely well, which is to move enormous amounts of data per second to a GPU that sits right next to it.
+
+A few things make HBM different from the DDR5 RAM in your laptop:
+
+- It is physically stacked on top of the GPU die, not on a separate stick across the motherboard. The wires between HBM and the GPU are millimeters long, not centimeters.
+- The connection is enormously wide. A modern HBM stack has a 1024-bit interface, roughly 16 times wider than DDR5.
+- The capacity is limited compared to system RAM. A top-tier GPU has 192 GB of HBM. A typical inference server has many times that in system RAM.
+
+You might wonder if the system RAM can help when the model gets too big. The answer is no. System RAM sits behind PCIe, the connection between the CPU and the GPU, and PCIe is dozens of times slower than the HBM bus. Sweeping 70 GB of model parameters across PCIe for every token would push TPOT from milliseconds into seconds. As far as decode is concerned, system RAM might as well not exist.
+
+Think of HBM as the books spread out on your desk while you work. System RAM is books on the bookshelf across the room. Disk is books in a library down the hall. The closer the books, the faster you can read them, but the desk only holds so many at once.
+
+The model has to fit on the desk. If the desk is too small, the model spills onto the bookshelf, and the time you spend walking across the room destroys throughput.
+
+## Memory bandwidth, explained
+
+Bandwidth is the speed at which data flows out of HBM and into the compute units. The unit is gigabytes per second, often written GB/s. A 1 TB/s rating means one trillion bytes can move from memory to compute every second.
+
+Why does this matter? Recall the decode mechanism from the previous module. To produce one token, the GPU has to sweep the entire model through the compute units. If the model is 70 GB and the bandwidth is 3.35 TB/s (an H100), then a single sweep of the model takes about 21 milliseconds. That sets a hard floor on TPOT regardless of how fast the compute units are.
+
+Here is the math, simplified:
+
+```
+TPOT floor (ms) = Model size (GB) / Memory bandwidth (GB/s) × 1000
+```
+
+For a 70 GB model on an H100, the floor is 70 / 3350 × 1000 = 21 ms per token. For the same model on an H200 (4.8 TB/s), the floor is 70 / 4800 × 1000 = 14.6 ms per token. The H200 isn't faster at math, it just has a wider pipe.
+
+If your AI team is asking for a tight TPOT target, you can usually trace the answer back to this formula. Either the bandwidth has to grow, the model has to shrink, or both.
+
+## Precision: how to halve the memory
+
+The model has a fixed number of parameters. Llama 3.1 70B has 70 billion of them. But the size of those parameters in bytes depends on how each one is stored.
+
+The original model is usually stored at 16 bits (2 bytes) per parameter. That format is called BF16 or FP16. A 70-billion-parameter model at 16 bits takes 140 GB of HBM. That is larger than a single H100 (80 GB), so you would need two H100s just for the weights.
+
+At 8 bits (1 byte) per parameter, the model fits in 70 GB. That is <GlossaryTerm id="fp8">FP8</GlossaryTerm> or INT8. At 4 bits per parameter, it fits in 35 GB. That is INT4.
+
+Cutting precision does three things at once:
+
+1. **Halves (or quarters) the memory footprint.** A 70B model at FP8 fits where a 35B model at BF16 would.
+2. **Halves (or quarters) the bandwidth requirement per token.** Sweeping 70 GB is twice as fast as sweeping 140 GB through the same pipe.
+3. **Loses a small amount of model quality.** For most production workloads, FP8 is indistinguishable from BF16. INT4 starts to show quality loss on reasoning tasks.
+
+The 2026 baseline for production inference is FP8 on Hopper or Blackwell GPUs. If your AI team is still serving at BF16, ask why.
+
+## The GPU SKU landscape
+
+A few rough waypoints for the GPUs in production today:
+
+| SKU | HBM | Bandwidth | Notes |
+| --- | --- | --- | --- |
+| L40S | 48 GB | 864 GB/s | Cheapest data center option, no FP8 throughput |
+| A100 80GB | 80 GB | 2.0 TB/s | Last-gen workhorse, no FP8 |
+| H100 SXM | 80 GB | 3.35 TB/s | Hopper, FP8 capable |
+| H200 SXM | 141 GB | 4.8 TB/s | Hopper refresh, more HBM and bandwidth |
+| MI300X | 192 GB | 5.3 TB/s | AMD, FP8 capable |
+| B200 SXM | 192 GB | 8 TB/s | Blackwell, FP8 and FP4, needs liquid cooling |
+
+Notice the trend. Memory bandwidth roughly doubles every generation, but the actual capacity grows much more slowly. The right SKU is whichever combination of capacity and bandwidth lets your model fit and meet your TPOT target without buying more GPUs than you need.
+
+## If you only remember one thing
+
+A GPU is compute plus memory. The memory is HBM, and it holds the model weights, the KV cache for every active request, and a small overhead for activations and runtime workspace. The bandwidth of that memory sets the floor on decode latency. Precision is the lever that changes the math without changing the model. Picking the right GPU is mostly a matter of matching HBM capacity and bandwidth to the workload you plan to run.
+
+## What comes next
+
+You now have the vocabulary. HBM holds the model. Bandwidth controls how fast each token comes out. The next module is about a second consumer of HBM that grows as more users connect: the KV cache. The KV cache is the silent capacity killer, and once you have HBM in mind, the KV math will land hard.

@@ -1,0 +1,68 @@
+You have just spent Part II inside the GPU. You know what HBM is, why bandwidth matters more than compute for decode, what the KV cache is and how it multiplies with context and concurrency, and which architectural levers reduce that pressure without buying more GPUs.
+
+Now zoom back out. The traditional IT planning rhythm has worked for a decade because hardware scaling was predictable. If you needed more capacity, you added a standardized node. Compute, memory, and I/O scaled in balanced, familiar ratios. Rack-by-rack capacity planning was deterministic.
+
+Inference quietly breaks five of those foundational planning assumptions. The numbers look familiar on a spreadsheet, but if you plan against them the way you would plan a traditional web tier or database, you will either over-provision by a factor of four or hit catastrophic failures in production. This module names each broken assumption, says what replaces it, and points to exactly where IT and the AI team have to align before any hardware gets ordered.
+
+<figure className="my-8">
+  <img
+    src="/knowledge/four-broken-assumptions.png"
+    alt="Five traditional infrastructure planning assumptions (CPU hardware specs, users and requests, memory overcommit, existing facilities, standard Ethernet) side by side with the AI inference reality that replaces each one (HBM bandwidth, tokens and context, hard HBM ceiling, GPU power and cooling, specialized fabrics like NVLink, InfiniBand, and RoCE)."
+    className="mx-auto w-full max-w-3xl rounded-lg border border-slate-200"
+  />
+  <figcaption className="mt-2 text-center text-sm text-slate-500">
+    Five traditional planning assumptions side by side with what replaces them in an AI inference workload.
+  </figcaption>
+</figure>
+
+## Assumption 1: You can plan from standard hardware spec sheets
+
+Traditional planning starts with CPU cores, clock speed, RAM capacity, and network bandwidth. For AI inference, these headline specs hide the real constraint.
+
+The actual constraint, as Part II made clear, is HBM bandwidth. Serving an LLM is a data-delivery problem. The GPU spends far more time waiting for model parameters to arrive from memory than it does actually computing on them. An H100 and an H200 have nearly identical compute power, but the H200's 43 percent higher memory bandwidth unlocks 60 to 90 percent more token throughput. The spec that matters does not appear on the standard procurement form.
+
+## Assumption 2: Sizing is driven by user headcount and request rates
+
+Traditional sizing asks two questions: how many users, and how many requests per second. For inference, headcount is not the right unit.
+
+The defining metrics are tokens in flight at peak and the length of the context window. The same 500 users asking short questions over a 4,000-token context produce a light footprint. Switch those same 500 users to deep document analysis over a 128,000-token context, and the infrastructure requirement jumps by an order of magnitude. The user count didn't move. The token volume did.
+
+## Assumption 3: Memory has a graceful degradation path
+
+In traditional virtualization, memory is fluid. If a database spikes, it spills to system RAM or swaps to NVMe. Performance degrades, but the service stays alive. IT teams routinely overcommit memory, assuming not everyone will max at once.
+
+AI inference has no graceful degradation, and overcommit is dead. The KV cache must live in HBM, right next to the model weights. As you saw in M4, system RAM sits behind PCIe, which is dozens of times slower than the HBM bus. If HBM fills up in production, requests do not slow down. They fail outright. You provision for the hard peak ceiling, every time.
+
+## Assumption 4: Existing facilities can house the hardware
+
+For a decade, data centers have planned to an 8 to 15 kilowatt per rack envelope. That accommodates dense rows of CPU servers comfortably.
+
+A single 8-GPU HGX H100 or H200 chassis draws 10 to 12 kilowatts on its own. One server fills the entire legacy rack power budget. Four of them in a rack pushes 40 kilowatts. A liquid-cooled Blackwell NVL72 rack pushes 120 to 140 kilowatts. GPUs also run near their thermal design power continuously during inference, not in bursts. This is a facilities conversation that has to happen months before hardware arrives on the loading dock.
+
+## Assumption 5: Standard Ethernet handles inter-server traffic
+
+In traditional infrastructure, the network is a solved problem. Web servers talk to databases over 10 or 25 GbE. The fabric is reliable, the latencies are predictable, and most enterprise teams stopped thinking hard about it years ago.
+
+For AI inference, this breaks the moment a model does not fit on a single GPU. When you split a model across multiple GPUs (which Part IV covers in detail), every output token requires the GPUs to exchange enormous amounts of intermediate state with each other. With standard Ethernet, that exchange becomes the bottleneck. A 70B model running across two GPUs over 100 GbE will deliver a fraction of the throughput of the same model on NVLink-connected GPUs, often 5 to 10 times slower.
+
+This forces three specialized fabrics into your design:
+
+- **NVLink and NVSwitch** inside an HGX chassis. These are GPU-to-GPU interconnects with terabytes per second of bandwidth, built into the baseboard. You do not buy them separately.
+- **InfiniBand NDR (400 Gb)** between chassis when you need tensor parallelism across nodes. This is purpose-built lossless fabric with hardware-level RDMA support.
+- **RoCEv2 (RDMA over Ethernet)** as a more flexible alternative to InfiniBand, but only when configured with priority flow control (PFC) and explicit congestion notification (ECN). Vanilla Ethernet is not enough.
+
+The networking decision depends entirely on the AI team's parallelism strategy, which itself depends on the model size. Another conversation that has to happen before any switches are ordered.
+
+## The blindspot
+
+The unifying lesson from all five is that infrastructure is no longer decoupled from model choices. A single engineering decision from the AI team can completely rewrite your physical infrastructure requirements. Picking a model size dictates HBM capacity. Picking a precision dictates memory and bandwidth. Picking a context window dictates KV cache budget. Picking a parallelism strategy dictates the fabric that connects your GPUs to each other.
+
+If you plan networking, storage, and node layouts from a passive hardware requisition form without understanding the AI team's architectural roadmap, you will build the wrong architecture and not know it until production.
+
+## What comes next
+
+Part II built the vocabulary. The next part of the curriculum puts that vocabulary to work. It names the seven parameters that drive every sizing decision, walks through a complete worked example, and lays out the conversation you need to have with the AI team before a single GPU is ordered.
+
+<TryInSizer
+  prompt="Open the Sizer with the default 70B Llama RAG workload to see how changing context length completely resizes the physical hardware footprint."
+/>

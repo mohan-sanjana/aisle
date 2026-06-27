@@ -1,18 +1,18 @@
-The first four modules built up the vocabulary. You know what inference is, why the old playbook breaks, what happens inside a GPU when a request lands, and why the KV cache is the silent driver of capacity. This module turns that vocabulary into a short list of inputs. Seven parameters. Get them right and a sizing exercise becomes mechanical. Get them wrong, or skip one, and you spend weeks rebuilding the spreadsheet later.
+Parts I and II built up the vocabulary. You know what inference is, how a token gets made, why HBM bandwidth and the KV cache are the dominant constraints, and why traditional planning assumptions break for AI workloads. This module turns that vocabulary into a short list of inputs the Sizer (and every infrastructure conversation) takes. Seven parameters. Get them right and the sizing exercise becomes mechanical. Get them wrong, or skip one, and you spend weeks rebuilding the spreadsheet later.
 
-The seven are not arbitrary. Every parameter on the list moves the recommended infrastructure by a factor that matters. Every parameter that is not on the list either follows from these seven or is a defensible default. If a planning conversation skips any of them, the answer is not stable.
+The Sizer takes about twenty inputs in total, but these seven are the load-bearing ones. The rest either follow from these or default sensibly.
 
 <Callout variant="key">
 The seven sizing inputs are: model size, precision, context length, concurrent users, requests per user per minute, latency targets (TTFT and TPOT), and burst factor. These map one-to-one to the Sizer's inputs and to the math in the spec.
 </Callout>
 
-## 1. Model size
+## 1. Model
 
-**What it is.** The parameter count, in billions. A 7B model has seven billion learned numbers. A 70B model has seventy billion. A 405B model has four hundred and five billion.
+**What it is.** The specific model the AI team has chosen. Two attributes of that choice drive sizing: the **parameter count** (in billions, e.g., 7B, 70B, 405B) and the **architecture** (dense, grouped-query attention, mixture-of-experts).
 
-**How it moves the math.** Model size sets the floor on GPU memory. At FP8, each parameter takes one byte, so a 70B model needs 70 GB just to hold the weights, before any conversation memory or activations. The model also has to be re-read from memory on every output token, so model size is the largest contributor to required memory bandwidth.
+**How it moves the math.** Parameter count sets the floor on GPU memory. At FP8, each parameter takes one byte, so a 70B model needs 70 GB just to hold the weights, before any conversation memory or activations. The architecture determines how the model uses memory beyond that. Dense models read every parameter on every token. MoE models activate only a fraction per token but still need all parameters resident in HBM, which changes the bandwidth math substantially. The model has to be re-read on every output token, so the choice of model is the single largest contributor to required memory bandwidth.
 
-**What to ask.** "Which model exactly?" not "how big a model?" The architecture matters as much as the parameter count. A 70B dense model and a 70B-class MoE model have very different infrastructure profiles even though the headline number is the same.
+**What to ask.** "Which model exactly?" not "how big a model?" A 70B dense model and a 70B-class MoE model have very different infrastructure profiles even though the headline number is the same. The Sizer lets you pick a model family (Llama 3.1 70B, GPT-OSS 120B, etc.) which fills in both attributes from a canonical spec, or roll your own by entering parameter count and architecture separately.
 
 ## 2. Precision
 
@@ -26,17 +26,17 @@ The seven sizing inputs are: model size, precision, context length, concurrent u
 
 **What it is.** Two related numbers. The maximum context the application supports (`max_context`) and the average prompt plus output length (`avg_prompt + avg_output`) that real users actually generate.
 
-**How it moves the math.** Context drives the <GlossaryTerm id="kv_cache">KV cache</GlossaryTerm>, which is the per-request working memory you met in M4. KV cache size is linear in context length. Double the context, double the KV memory per request. The Sizer uses average length for the steady-state budget and treats `max_context` as a guardrail for worst-case bursts.
+**How it moves the math.** Context drives the <GlossaryTerm id="kv_cache">KV cache</GlossaryTerm>, which is the per-request working memory you met in the KV cache module. KV cache size is linear in context length. Double the context, double the KV memory per request. The Sizer uses average length for the steady-state budget and treats `max_context` as a guardrail for worst-case bursts.
 
 **What to ask.** "What context length does the application actually support, and what does the realistic average look like?" The two are almost always different. An application that supports 128K tokens usually averages 4K to 8K in practice. Sizing against the max is the most common way to over-provision by a factor of three or more.
 
 ## 4. Concurrent users
 
-**What it is.** The number of distinct human users (or upstream callers) talking to the system at the same time during peak hours.
+**What it is.** The number of distinct callers talking to the system at the same time during peak hours. In a chat application, this is the number of human users actively in a conversation. In an agentic workload, every agent and every sub-agent that holds an open LLM session also counts. A single human kicking off a research agent that spawns ten parallel sub-agents drives ten concurrent in-flight requests, not one. This matters more every quarter as agentic systems become the dominant production pattern.
 
 **How it moves the math.** Concurrency multiplies KV cache. A given context length costs roughly the same per request, but ten simultaneous requests cost ten times that. Concurrency, multiplied by context length, is the term that determines how many GPUs you actually need.
 
-**What to ask.** "Peak concurrent users during the busiest hour, not registered users." A SaaS application with 50,000 registered users might have 200 concurrent at peak. Plan against 200, not 50,000. If the application is internal-only, ask whether the time zone of the user base concentrates load into a narrower window.
+**What to ask.** "Peak concurrent callers during the busiest hour, counting every agent invocation separately." A SaaS application with 50,000 registered users might have 200 concurrent humans at peak. Plan against 200, not 50,000. For agentic systems, multiply that by the typical fan-out of agents per human action.
 
 ## 5. Requests per user per minute
 
@@ -68,7 +68,7 @@ The seven above are the load-bearing inputs. Two more are worth flagging because
 
 **Redundancy mode** (N, N+1, or N+2). This is the number of spare replicas the cluster carries above what is needed to serve the workload. The default of N+1 means one replica can fail without service degradation. Mission-critical or regulated workloads use N+2. The choice is operational, not technical, and it lives with the application owner.
 
-**Serving engine** (vLLM, TensorRT-LLM, SGLang, Triton). The choice changes per-replica throughput by 15 to 25 percent at the margin, but every modern engine implements continuous batching and PagedAttention, so the math is similar across them. The AI team picks this; the IT team confirms that whichever they picked supports the optimizations covered in M8.
+**Serving engine** (vLLM, TensorRT-LLM, SGLang, Triton). The choice changes per-replica throughput by 15 to 25 percent at the margin, but every modern engine implements continuous batching and PagedAttention, so the math is similar across them. The AI team picks this; the IT team confirms that whichever they picked supports the optimizations a production cluster needs.
 
 Everything else in the Sizer (optimization toggles, KV dtype, prefix caching) lives in the Advanced step and has safe defaults. The defaults are tuned to match the 2026 production baseline. You only need to touch them when the AI team has made an explicit choice that deviates from that baseline.
 

@@ -1,0 +1,36 @@
+When an organization first commits to AI infrastructure, the request that lands on the IT team is usually vague. "Stand up some GPUs for the AI team." On its own that sounds like any other infrastructure ask: pick the hardware, rack it, hand over credentials. But unlike traditional workloads, running the exact same model behind a background RAG pipeline is a very different infrastructure conversation from running it behind an interactive, low-latency chat. The model is the same. The hardware needs are not.
+
+This curriculum is about closing that gap. The IT teams who can have a productive conversation with the AI team about which deployment they are actually building tend to end up with infrastructure that fits. The first step is naming the thing you are actually building. What is AI inference, how is it different from the work that produced the model in the first place, and why are most enterprises going to run it on their own hardware?
+
+## Two activities, very different infrastructure
+
+<GlossaryTerm id="training">Training</GlossaryTerm> is the process of teaching a model. You take a vast dataset, often the entire public internet, and let the model gradually adjust its billions of internal weights so it learns to predict what comes next. The whole process runs for weeks or months on thousands of GPUs. Training a model the size of Llama 3.1 70B takes on the order of a million GPU-hours. It is the most expensive thing humans do with computers, and it happens once per major model release. Almost no enterprise trains models from scratch. The few that do operate at the frontier (Anthropic, OpenAI, Meta, Google), and they run infrastructure measured in *gigawatts*, not megawatts.
+
+<GlossaryTerm id="inference">Inference</GlossaryTerm> is what happens every time you actually *use* the model. Every chat message, every code completion, every document summary. The model's weights are fixed, you feed it some input, and it produces output. A single inference takes milliseconds to seconds, not weeks. But unlike training, you do it millions of times a day.
+
+The analogy that helps most people see the difference is the lifecycle of a person becoming useful at a job. **Training is school. Fine-tuning is graduate studies. Inference is doing the job, every day, for the rest of your career.** Training is when the model learns the basics of how language and the world work. Fine-tuning is when you specialize it for a particular domain or company. Inference is everything that happens after that. The model actually shows up to work and produces something useful.
+
+The infrastructure consequences of this lifecycle are stark. Training and fine-tuning happen rarely and run for a long time on huge clusters. Inference happens constantly, runs in milliseconds per request, and has to be cheap enough to repeat millions of times a day. They need very different machines and very different budgets.
+
+<Callout variant="key">
+**Inference is where the business value lives.** Training and fine-tuning produce the model, but inference is what your users actually touch every day. For most enterprises, it is also the primary AI workload you will run on-prem. The rest of this curriculum focuses on inference. Training is a separate conversation.
+</Callout>
+
+## Why on-prem, why now
+
+For a few years, "use the API" was a complete answer. OpenAI, Anthropic, and Google offer hosted inference. Tokens come out of the wire, your data goes in. For prototypes and many production workloads, that is still the right answer.
+
+On-prem inference exists for a small number of concrete reasons, usually two or three at once:
+
+- **Data residency.** Healthcare, finance, defense, and EU public-sector workloads often cannot send prompts to an external cloud API. Inference must happen strictly inside the organization's boundary.
+- **Cost at scale.** Once you are past a few billion tokens a month, owned infrastructure becomes cheaper than API-billed inference. The crossover depends on your model and utilization, but the rule of thumb is roughly $1 to $2 million per year of API spend.
+- **Proprietary and fine-tuned models.** If your data science team has heavily customized, fine-tuned, or optimized an open-weight model specifically for your business logic, hosting that highly proprietary IP on a third-party public API is often a non-starter.
+- **Latency and locality.** Agentic workflows that make twenty tool calls per turn want millisecond round-trips. The closest cloud region is sometimes too far.
+
+Aisle is the planning tool for the moment you have decided the answer is on-prem.
+
+## What comes next
+
+You now know what inference is and why most enterprises will run it themselves. The rest of this curriculum will give you the vocabulary to plan honestly, the math to size confidently, and the checklist to have a productive, collaborative conversation with the AI team.
+
+Every module from here on will talk about tokens, latency, memory, and bandwidth. Before any of that makes sense, you need to know what a token actually is. That is the next module.

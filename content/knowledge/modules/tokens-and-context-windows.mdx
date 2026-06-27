@@ -1,0 +1,50 @@
+<Callout variant="note">
+If you already know what tokens and context windows are, feel free to skip ahead to the next module.
+</Callout>
+
+When you ask an AI model a question and it answers, the model never actually sees your words. It sees a stream of numbers. Those numbers are tokens, and the token is the unit on which everything in inference is measured. This module covers what a token is and why a number called the context window decides how much the model can hold in mind at once.
+
+## What a token actually is
+
+A token is the unit of text the model reads and writes. Not a letter. Not a word. Something in between. Each token represents a chunk of text, sometimes a whole common word like "the" or "house," sometimes a piece of a less common word so "infrastructure" gets broken into "infra" plus "structure," sometimes a single character or piece of punctuation.
+
+The rule of thumb good enough for almost all sizing conversations:
+
+**One token is about 4 characters of English text, or roughly three quarters of a word.**
+
+A 1,000-word essay is about 1,300 tokens. The mapping varies a bit by language and content type. Code, math, and non-English text tend to use more tokens per character. For planning purposes, the four-character approximation is within ten percent of the truth, which is good enough.
+
+## Why models read in tokens
+
+The simplest answer is efficiency. If the model had to read one letter at a time, it would need many more steps to understand a sentence. If it had to memorize one entry per word, its vocabulary would have to cover every variation of every word in every language. Tokens are the compromise. The model learns a vocabulary of common chunks during training, then composes any input from those chunks.
+
+A reader does something similar. When you read fluently, you don't process one letter at a time. You see common chunks like "tion" or "ing" or whole short words and read them as a unit. The model is doing the same thing, except the chunks are chosen for the model's convenience during training, not for the human eye.
+
+## Context windows: how much the model can hold at once
+
+The **context window** is the maximum number of tokens a model can keep in mind at one time. Everything you send in (the prompt, the system instructions, the retrieved documents) plus everything the model generates has to fit inside this window.
+
+Some rough waypoints from the modern era:
+
+- The first generation of LLMs around 2020 had context windows of about 1,000 to 4,000 tokens, roughly a page.
+- By 2024, open models had moved to 8K, 32K, and 128K windows. 128K is about a 300-page novel.
+- Recent frontier models advertise context windows of 1 million tokens or more. A million tokens is roughly the entire Lord of the Rings trilogy plus a few short stories.
+
+Bigger context windows sound like an unambiguous win. The trade-off is hidden in the next two modules. Every additional token of context costs memory and latency at inference time, and the cost grows faster than the context itself. A 128K conversation does not cost 32 times what a 4K conversation costs. It usually costs more.
+
+For sizing purposes, what matters is two numbers:
+
+- The **maximum context** the application will accept. This is the upper bound for your memory budget.
+- The **average context** the system actually sees in production. This is what your steady-state planning is based on.
+
+These two are almost always different. A model supporting 128K usually averages 4K to 8K in practice. Sizing against the max is the most common way to over-provision GPU memory by a factor of three or more.
+
+## Why tokens are the unit of everything
+
+Once you have tokens as the unit, the rest of the curriculum reads as a single coherent story. Cost is per token, in both directions, whether you are paying an API per token or paying for hardware that produces tokens per second. Latency is measured in two token timings: <GlossaryTerm id="ttft">TTFT</GlossaryTerm> is per request, and <GlossaryTerm id="tpot">TPOT</GlossaryTerm> is per token. Working memory in the GPU is allocated per token of context, per in-flight request. Cluster throughput is quoted in tokens per second, not requests per second.
+
+If you only remember one thing from this module, remember the unit. Not words. Not requests. Tokens.
+
+## What comes next
+
+You now know what a token is and what a context window is. The next module zooms in on how the model actually produces a token. The short answer is one at a time. The long answer takes the whole next module.
