@@ -1,4 +1,4 @@
-The last module ended with HBM holding three things: the model weights, the KV cache, and a small overhead. The model weights you already understand. This module covers the second tenant, the KV cache, and why it ends up being the single biggest determinant of how many users your infrastructure can serve.
+The last module ended with prefill leaving something behind: the KV cache, the model's working memory for each conversation. It lives in HBM right next to the model weights. This module covers what it is and why it ends up being the single biggest determinant of how many users your infrastructure can serve.
 
 If you take one thing from this module, take this: the KV cache grows in two directions simultaneously, with context length and with concurrent users, and the two multiply. When you change either one, your memory budget moves by an order of magnitude, not a small percentage.
 

@@ -1,5 +1,68 @@
-<Callout variant="note">
-This module is in draft. Content coming soon.
-</Callout>
+The previous module ended with a recommendation: four HGX H200 chassis with 100 GbE frontend. That sentence is a complete sizing answer. It is also a complete mystery if you have never seen an inference server up close. This module opens one chassis and walks every layer. By the end you should be able to read a vendor spec sheet for any modern AI server and know what each line item does.
 
-What a complete on-prem inference server looks like: CPU class, RAM ratio to GPU, NVMe sizing, NIC topology, NVLink, power draw, cooling tier, and the facility envelope it has to live in.
+## The heart: the GPU baseboard
+
+Inside a modern inference server, eight GPUs sit on a single board called the HGX baseboard (or OAM, on AMD systems). The HGX H200 is the example to keep in mind: eight H200 SXM modules, each with 141 GB of HBM, soldered to a board engineered for one purpose, which is to keep the GPUs fed with data and cool while moving terabytes per second between them.
+
+The baseboard is not something you assemble from parts. NVIDIA (or AMD) ships it as a complete subsystem with the GPUs already installed, the NVLink switches in place, and the power distribution wired up. Your server vendor (Supermicro, Dell, Lenovo, HPE) buys the baseboard and wraps it in a chassis with everything else.
+
+The eight GPUs on the baseboard talk to each other over NVLink, a point-to-point GPU-to-GPU interconnect, and through NVSwitch chips that act as a fabric inside the chassis. Total bisection bandwidth across the eight GPUs is on the order of terabytes per second. When one GPU writes a tensor to another during a tensor-parallel forward pass, that write moves at HBM-bus speeds, not at PCIe speeds.
+
+This matters because of an assumption from Part II. Tensor parallelism inside one chassis is fast and cheap. Tensor parallelism across chassis is slow and expensive. The HGX baseboard is the fast zone. Stay inside it whenever you can. The next module unpacks the boundary case in detail.
+
+## The host: CPU and RAM
+
+The GPUs do the AI work. The CPU does everything else.
+
+A modern inference server uses two CPU sockets, typically populated with Intel Xeon Platinum (8568Y+ class) or AMD EPYC (9554 class) processors. Each socket has 48 to 64 cores. The CPU's job is to tokenize incoming requests, route them to the right GPU, handle TCP and HTTP, manage the serving engine's scheduling logic, and shuffle data in and out of the host. It is not on the critical token-generation path, but starve it and everything slows down.
+
+System RAM sits on the CPU side. The rule of thumb is **twice the total GPU VRAM**, with a floor of 1 TB. For an 8-GPU H200 chassis (8 × 141 GB ≈ 1.1 TB of HBM), the RAM is typically 2 TB of DDR5. The RAM holds copies of the model weights staged for loading, working buffers for the serving engine, and a spillover area for cold KV cache pages when KV offload is enabled.
+
+Higher RAM (3 TB or more) is appropriate when you have enabled KV offload to host memory. The managing KV pressure module called this out as one of the levers to relieve memory pressure. The host RAM is where those cold pages live.
+
+## Local storage: NVMe
+
+Each chassis has a tier of fast local storage on NVMe. The roles are:
+
+- **Model registry cache.** When a replica boots, it loads the model weights into HBM. For a 70B model at FP8, that is 70 GB to move from somewhere. If that somewhere is across a slow network, cold-start times stretch into minutes. Local NVMe holds the weights so restart is seconds, not minutes.
+- **KV cache spillover.** If KV offload is enabled, cold KV pages can spill from host RAM further down to NVMe. The latency hit is real but acceptable for cold blocks.
+- **Telemetry and logs.** Every request generates structured logs. Most are shipped to a central observability stack, but local NVMe holds the buffer.
+
+Typical configuration is 8 drives of 3.84 TB NVMe Gen5 in a RAID-10 layout, about 15 TB of usable, fast, resilient local storage. Larger models or KV-heavy workloads scale to 12 or 16 drives.
+
+## The NIC layer
+
+A modern inference chassis has two distinct networking concerns.
+
+**Frontend.** Traffic between clients (or upstream API gateways) and the inference server. Typical configuration is **2 × 100 GbE bonded** for redundancy. This is the only network concern for a single-chassis deployment.
+
+**Compute fabric.** If the workload requires tensor parallelism that spans multiple chassis (a topic the next module unpacks), the chassis needs a high-bandwidth backend fabric. Typical configuration is **one ConnectX-7 or ConnectX-8 NIC per GPU at 400 Gb**, running either NDR InfiniBand or RoCEv2. Eight NICs per chassis, each wired into a dedicated rack-top switch.
+
+For single-chassis deployments, you only need the frontend. The four HGX H200 RAG bank workload from the previous module is exactly that case: TP=2 stays inside the chassis, no backend fabric required.
+
+## Power, cooling, and the facility
+
+A traditional enterprise data center rack handles 8 to 15 kW with conventional air cooling. A single HGX H200 chassis draws 10 to 12 kW. Stack four of them in one rack and you are at 40 to 50 kW, well past what air can do.
+
+Sustained chassis draw, by GPU generation:
+
+- **HGX H100 or H200:** 10 to 12 kW
+- **DGX B200:** 14.3 kW
+- **GB200 NVL72 (full rack):** 120 to 140 kW
+
+The cooling tier you need is set by the rack's kilowatt density:
+
+- **Air (under 15 kW per rack):** one HGX chassis with spare capacity, or smaller deployments using L40S-class GPUs.
+- **Dense air with hot-aisle containment (15 to 35 kW per rack):** two or three HGX chassis when the data center supports containment.
+- **Rear-door heat exchangers (35 to 80 kW per rack):** the typical choice for four HGX H200 chassis sharing one rack.
+- **Direct-to-chip liquid (above 80 kW per rack):** mandatory above 100 kW and the only option for GB200 NVL72-class deployments.
+
+The cooling decision drives the data center retrofit conversation. If the existing facility tops out at air, the AI deployment waits for a rear-door HX retrofit, moves to a partner colo that supports the right tier, or trades down to less-dense hardware. This conversation has to start months before any hardware lands on the loading dock.
+
+The facility also needs the overall power budget (utility feed, PDUs, transformers), the cooling distribution capacity (chillers, dry coolers, or in-row liquid manifolds), and the floor load rating for liquid-cooled racks. For the four-chassis HGX H200 deployment from the previous module, the facility envelope works out to about 50 kW of IT load. With a PUE of 1.25 (rear-door HX), total facility draw is about 60 kW. The rack layout can be two racks at 24 kW each, four racks at 12 kW each, or some mix that fits the existing power feeds and cooling distribution.
+
+## Putting it together
+
+A single modern inference chassis is, in one sense, just a server. A box with CPUs, RAM, storage, and network cards. In every practical sense, it is something newer. The GPU baseboard sets the chassis's behavior. The CPU, RAM, NVMe, and NICs all exist to feed and support that baseboard. The power and cooling envelope it demands forces a conversation with the facility team that traditional servers do not.
+
+The next module covers what happens when one chassis is not enough. When the model is too big, the workload too large, or the latency budget too tight, you start spanning multiple GPUs across multiple chassis. That is where the compute-fabric NICs come into play, tensor parallelism leaves the comfort of NVLink, and the planning conversation gets noticeably more complex.

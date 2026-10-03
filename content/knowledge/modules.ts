@@ -61,26 +61,26 @@ export const MODULES: ReadonlyArray<ModuleMeta> = [
     prerequisites: ["what-is-inference"],
   },
   {
-    slug: "how-a-model-serves",
-    index: 3,
-    part: 1,
-    title: "How a model makes a token",
-    summary:
-      "The two-phase mechanism that produces each token: prefill (parallel, compute-bound) and decode (sequential, memory-bound), and the TTFT and TPOT timings each phase sets.",
-    learning_objective:
-      "Distinguish prefill from decode, name the timings each phase produces (TTFT and TPOT), and explain why decode is memory-bound while prefill is compute-bound.",
-    prerequisites: ["tokens-and-context-windows"],
-  },
-  {
     slug: "inside-a-gpu",
-    index: 4,
+    index: 3,
     part: 2,
     title: "Inside a GPU",
     summary:
       "What a GPU actually is, why HBM holds the model, and why memory bandwidth, not compute, sets the floor on decode latency.",
     learning_objective:
-      "Name the three things HBM holds, explain why memory bandwidth sets the TPOT floor, and compare the major GPU SKUs by capacity and bandwidth.",
-    prerequisites: ["how-a-model-serves"],
+      "Explain what HBM is and why it differs from system RAM, calculate the TPOT floor that memory bandwidth sets, and use precision as a lever to shrink a model's footprint.",
+    prerequisites: ["tokens-and-context-windows"],
+  },
+  {
+    slug: "how-a-model-serves",
+    index: 4,
+    part: 2,
+    title: "How a model makes a token",
+    summary:
+      "The two-phase mechanism that produces each token: prefill (parallel, compute-bound) and decode (sequential, memory-bound), and the TTFT and TPOT timings each phase sets.",
+    learning_objective:
+      "Distinguish prefill from decode, name the timings each phase produces (TTFT and TPOT), and explain why decode is memory-bound while prefill is compute-bound.",
+    prerequisites: ["inside-a-gpu"],
   },
   {
     slug: "kv-cache",
@@ -91,7 +91,7 @@ export const MODULES: ReadonlyArray<ModuleMeta> = [
       "Why each in-flight conversation needs its own working memory, and why context length and concurrency multiply.",
     learning_objective:
       "Define the KV cache, calculate why it dominates memory in long-context workloads, and predict how changing context length or concurrency moves the capacity budget.",
-    prerequisites: ["inside-a-gpu"],
+    prerequisites: ["how-a-model-serves"],
   },
   {
     slug: "managing-kv-pressure",

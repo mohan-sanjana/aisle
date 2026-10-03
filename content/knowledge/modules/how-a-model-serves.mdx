@@ -1,52 +1,57 @@
-When you send a question to an AI model, it produces an answer one token at a time. That sounds simple, but the way the model makes a single token has two completely different mechanisms in sequence, each with its own hardware profile. Once you see this split, the rest of the infrastructure conversation about latency starts to make sense.
+When you send a prompt to an LLM, it produces an answer one token at a time. To do so, two sequential steps need to happen. It is important to understand each one, because each has its own hardware profile and a distinct impact on the infrastructure conversation.
 
 ## A request lands
 
-A user types a question, hits send, and the prompt flies to the inference server. Before the GPU can do anything with it, two things have to happen.
+When a user sends a question, or really any prompt, the prompt first reaches the inference server. Before it reaches the model, it needs to be converted into tokens. A small piece of software called a tokenizer turns the raw text into tokens. This is fast and happens on the CPU.
 
-First, the prompt becomes tokens. A small piece of software called a tokenizer turns the raw text into the numeric IDs we discussed in the previous module. This is fast and happens on CPU.
+Once tokenized, the prompt reaches the GPU, where the language model is already loaded into HBM (that loading happens once, at startup).
 
-Second, the tokens get handed to the GPU. The model is already loaded in GPU memory (this happens once at startup), so processing a new request is just streaming the new tokens onto an already warm machine.
+## Phase 1: Prefill
 
-From here on, the GPU does the work. And it does that work in two completely different phases.
+If you recall the reading sections of the SAT (yes, it may have been a few years), you hopefully read the whole passage and understood its essence before answering any question. The language model's first step, called <GlossaryTerm id="prefill">prefill</GlossaryTerm>, is much like you reading the passage for the first time.
 
-## Phase 1: Prefill (reading the prompt)
+In this phase, the GPU reads the incoming prompt. However, instead of reading the prompt one token at a time, the GPU reads all of it in parallel, much like an F1 pit crew changing all four tires at once. The thousands of compute cores inside the GPU work together to process the entire prompt in a single pass.
 
-The first thing the GPU does with the incoming prompt is read it. All of it. At once.
+The output of the prefill phase is something called the <GlossaryTerm id="kv_cache">key-value (KV) cache</GlossaryTerm>, which you can think of as the model's working memory. It is your understanding of the passage, which you will rely on as you answer the questions. The KV cache gets its own module shortly.
 
-This phase is called <GlossaryTerm id="prefill">prefill</GlossaryTerm>. The model needs to compute what every token in the prompt means in this specific context, since the word "leave" in "parental leave" carries a different meaning from the word "leave" in "what time should we leave."
+## Phase 2: Decode
 
-Think of an F1 pit crew changing all four tires at once. The crew doesn't wait to finish the front-left tire before starting the rear-right. They flood the car with mechanics so the entire job is done at the same time. Prefill works the same way. It processes the entire prompt in parallel, completely saturating the thousands of tiny compute cores inside the GPU. A 1,500-token prompt on a 70B model might clear prefill in just 200 milliseconds.
+Once the model understands the prompt, it generates the response one token at a time. Here it is much more like us, stringing one word after another. This phase is called <GlossaryTerm id="decode">decode</GlossaryTerm>.
 
-There is an infrastructure catch. Prefill is bound by the GPU's raw compute power. Long prompts put massive immediate strain on your GPU cores. Prefill is also the phase that builds up the working memory the model will use during the next phase, called the <GlossaryTerm id="kv_cache">KV cache</GlossaryTerm>. We will dive into the KV cache in module 2.2.
+To generate a single token, the GPU has to sweep through the entire 70 GB of model parameters. Then it repeats that sweep for every token after that. Every output token requires the entire model to flow through the GPU's memory bus, end to end.
 
-The brief wall-clock delay the user feels before the first word streams back is called <GlossaryTerm id="ttft">Time to First Token (TTFT)</GlossaryTerm>. Prefill is what sets it.
+## What does this mean for the infrastructure?
 
-## Phase 2: Decode (generating the answer)
+Prefill, where the entire prompt is read at once, **is bound by the GPU's raw compute power**. The strain on the compute cores is proportional to the length of the prompt: the longer the prompt, the greater the strain.
 
-Once the model understands the prompt, it switches modes entirely. Now it generates the response one single token at a time. This phase is called <GlossaryTerm id="decode">decode</GlossaryTerm>.
+Decode is different. The GPU is constantly moving 70 GB of data *per token*, and while it does that, the massive compute units sit mostly idle, waiting for data to arrive from memory. That is the memory bandwidth floor from the previous module in action. **Decode is bound by memory bandwidth, not compute.**
 
-Here is the surprise. To generate one single token, the GPU has to sweep through the entire 70 GB of model parameters, run them through its compute units, and produce a result. Then for the next token, it sweeps through the same 70 GB again. And again for the token after that. Every output token requires the entire model to flow through the GPU's memory bus from end to end.
+## Why should I care?
 
-Because the GPU is constantly moving 70 GB of data per token, its massive compute units sit mostly idle. They are waiting for data to arrive from memory. Decode throughput is bound by **memory bandwidth**, not compute. We will dive into what memory bandwidth means and why it matters in module 2.1.
+Earlier in the curriculum, we briefly met the two key measures of latency:
 
-The time between consecutive output tokens is called <GlossaryTerm id="tpot">Time per Output Token (TPOT)</GlossaryTerm>. Decode is what sets it.
+- **TTFT, Time To First Token.** This is the pause before your ChatGPT or Claude window shows even a single word. That delay is set by the prefill phase.
+- **TPOT, Time Per Output Token.** This is the time the model takes to generate each subsequent token. As you probably guessed, the decode phase sets it.
 
-## The full picture
+Both shape how fast your users perceive the system to be. So the infrastructure you use for inference needs to serve both the prefill and decode phases well.
 
-A request from the user's keyboard to the streamed response looks like this:
+## An example
+
+The total time a user waits is TTFT plus the number of output tokens multiplied by TPOT. A 300-token answer at 30 ms per token, plus a 200 ms prefill, takes about 9.2 seconds. Streamed back token by token, that feels natural. Delivered as a single block at the end, it would feel slow.
 
 <KnowledgeMermaid name="request-lifecycle" caption="A single request, from authentication to streamed response. Prefill happens once, in parallel. Decode happens once per output token, sequentially." />
 
-The total wall-clock time the user waits is TTFT plus the number of output tokens multiplied by TPOT. A 300-token answer at 30 ms per token plus a 200 ms prefill takes about 9.2 seconds. Streamed back token by token, this feels natural. Delivered as a single response at the end, it would feel slow.
-
 ## What this means for IT planners
 
-Understanding this two-phase split tells you which hardware levers to pull when planning with your AI team:
+As might be painfully obvious by now, prefill and decode are bound by two completely separate GPU characteristics, each expensive in its own right. That poses an interesting challenge for you as the infrastructure planner. Do you have your cake or do you eat it?
 
-1. **Long prompts and short answers** (analyzing legal contracts or financial logs) will spend most of their time in **prefill**. You need to provision for heavy GPU compute.
-2. **Short prompts and long answers** (interactive chatbots, code generation assistants) will spend most of their time in **decode**. You need to prioritize memory bandwidth.
+The answer depends on the nature of the workloads your AI team expects:
 
-## What comes next
+- **Long prompts and short answers.** Workloads like analyzing legal contracts or financial logs spend most of their time in prefill. You need to provision for heavy GPU compute.
+- **Short prompts and long answers.** Interactive chatbots and code generation assistants spend most of their time in decode. You need to prioritize memory bandwidth.
 
-You just heard that decode is bound by memory bandwidth, not compute. The next module steps inside the GPU itself, looks at the memory that holds the model, and shows why bandwidth is the spec that decides everything else.
+## Summary and what comes next
+
+In this module, we looked at prefill and decode, the two sequential steps that take an input prompt and give you... a "princess." Umm, nope. They give you an output. We also saw that the two steps are like oil and water in their GPU requirements. Prefill is bound by the GPU's compute cores, while decode is constrained by the bandwidth of the GPU's memory.
+
+Prefill also left something behind: the KV cache. The next module looks at what lives inside it, and why it ends up deciding how many users your infrastructure can serve at once.
